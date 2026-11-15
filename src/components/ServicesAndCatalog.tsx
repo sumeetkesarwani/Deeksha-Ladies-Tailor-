@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DESIGN_PATTERNS, SERVICE_OFFERINGS, formatCurrencyINR } from '../utils/tailoring.ts';
+import designerBlouseImg from '../assets/images/designer_blouse_craft_1794727219299.jpg';
 
 export function ServicesAndCatalog() {
   const [imageError, setImageError] = useState(false);
@@ -22,7 +23,7 @@ export function ServicesAndCatalog() {
             <div className="relative h-64 sm:h-72 lg:h-full min-h-[260px] rounded-2xl overflow-hidden border border-stone-200 bg-stone-100">
               {!imageError ? (
                 <img
-                  src="/src/assets/images/designer_blouse_craft_1794727219299.jpg"
+                  src={designerBlouseImg}
                   alt="Handcrafted crimson raw silk bridal blouse with gold zardozi embroidery and pearl latkan tassels"
                   referrerPolicy="no-referrer"
                   onError={() => setImageError(true)}

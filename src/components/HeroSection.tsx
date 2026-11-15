@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ArrowUpRight, CheckCircle2, Clock, Search } from 'lucide-react';
 import type { ReviewSummary, ShopDetails, TailoringOrder } from '../types.ts';
 import { buildOrderInquiryWhatsAppUrl, formatCurrencyINR } from '../utils/tailoring.ts';
+import heroAtelierImg from '../assets/images/hero_tailoring_atelier_1794727216987.jpg';
 
 interface TrackedOrderResult {
   id: string;
@@ -30,9 +31,9 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
   const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<TrackedOrderResult[]>([]);
 
-  const handleTrackSubmit = async (e?: FormEvent, presetQuery?: string) => {
+  const handleTrackSubmit = async (e?: FormEvent) => {
     if (e) e.preventDefault();
-    const activeQuery = (presetQuery ?? query).trim();
+    const activeQuery = query.trim();
     if (!activeQuery) {
       setSearchError('Enter a 10-digit mobile number, Bill No., or customer name.');
       setHasSearched(false);
@@ -58,11 +59,6 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
     }
   };
 
-  const handleQuickFill = (sampleQuery: string) => {
-    setQuery(sampleQuery);
-    void handleTrackSubmit(undefined, sampleQuery);
-  };
-
   return (
     <section id="top" className="border-b border-stone-200 bg-[#FAF8F6]">
       {shopDetails.announcement && (
@@ -82,7 +78,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-600 font-medium">
                 <span className="whitespace-nowrap">{shopDetails.city} · {shopDetails.landmark}</span>
                 <span className="font-semibold text-stone-900 tabular-nums whitespace-nowrap">
-                  · {reviewSummary.averageRating.toFixed(1)} / 5 ({reviewSummary.totalReviewsCount} reviews)
+                  · {reviewSummary.averageRating.toFixed(1)} / 5 Rating
                 </span>
               </div>
 
@@ -135,7 +131,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
             <div className="relative h-72 sm:h-96 lg:h-full min-h-[340px] rounded-2xl overflow-hidden border border-stone-200 bg-stone-200">
               {!imageError ? (
                 <img
-                  src="/src/assets/images/hero_tailoring_atelier_1794727216987.jpg"
+                  src={heroAtelierImg}
                   alt="Deeksha Ladies Tailor worktable with silk saree fabric, brass shears, measuring tape, and zari trim"
                   referrerPolicy="no-referrer"
                   onError={() => setImageError(true)}
@@ -158,39 +154,11 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
 
         {/* Full-width Live Order Tracker row */}
         <div id="track-order" className="bg-white rounded-2xl border border-stone-200 p-6 sm:p-8 space-y-5">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div className="space-y-1">
-              <h2 className="font-display text-2xl font-semibold text-stone-950">Track Your Tailoring Order</h2>
-              <p className="text-sm text-stone-600">
-                Enter your 10-digit phone number or Bill No. to check garment readiness, scheduled pickup date, and balance due.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-stone-500">
-              <span>Sample bills:</span>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('101')}
-                className="font-mono-tabular font-semibold text-rose-800 hover:underline"
-              >
-                #101
-              </button>
-              <span aria-hidden="true">·</span>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('102')}
-                className="font-mono-tabular font-semibold text-rose-800 hover:underline"
-              >
-                #102
-              </button>
-              <span aria-hidden="true">·</span>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('103')}
-                className="font-mono-tabular font-semibold text-rose-800 hover:underline"
-              >
-                #103
-              </button>
-            </div>
+          <div className="space-y-1">
+            <h2 className="font-display text-2xl font-semibold text-stone-950">Track Your Tailoring Order</h2>
+            <p className="text-sm text-stone-600">
+              Enter your 10-digit phone number or Bill No. to check garment readiness, scheduled pickup date, and balance due.
+            </p>
           </div>
 
           <form onSubmit={(e) => void handleTrackSubmit(e)} className="flex flex-col sm:flex-row gap-3">
@@ -204,7 +172,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Enter 10-digit mobile number or Bill No. (e.g. 101 or 9831200001)"
+                placeholder="Enter 10-digit mobile number or Bill No."
                 className="w-full pl-10 pr-4 py-2.5 border border-stone-300 focus:border-rose-800 rounded-lg text-sm text-stone-900 outline-none focus-visible:ring-2 focus-visible:ring-rose-800/20"
               />
             </div>

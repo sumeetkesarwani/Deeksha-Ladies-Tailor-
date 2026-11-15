@@ -92,10 +92,8 @@ export function ReviewsSection({
             <div className="flex flex-wrap items-center gap-3 pt-1 text-sm text-stone-700">
               <span className="inline-flex items-center gap-1 font-mono-tabular font-semibold text-stone-950">
                 <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                {reviewSummary.averageRating.toFixed(1)} / 5.0
+                {reviewSummary.averageRating.toFixed(1)} / 5.0 Rating
               </span>
-              <span aria-hidden="true" className="text-stone-400">·</span>
-              <span className="tabular-nums">{reviewSummary.totalReviewsCount} verified local ratings</span>
               <span aria-hidden="true" className="text-stone-400">·</span>
               <a
                 href={shopDetails.googleBusinessUrl}

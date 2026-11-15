@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MATCHING_CENTER_RATES } from '../utils/tailoring.ts';
 import type { ShopDetails } from '../types.ts';
+import matchingFabricsImg from '../assets/images/matching_center_fabrics_1794727217954.jpg';
 
 interface MatchingCenterSectionProps {
   shopDetails: ShopDetails;
@@ -29,7 +30,7 @@ export function MatchingCenterSection({ shopDetails }: MatchingCenterSectionProp
           <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border border-stone-200 bg-stone-200">
             {!imageError ? (
               <img
-                src="/src/assets/images/matching_center_fabrics_1794727217954.jpg"
+                src={matchingFabricsImg}
                 alt="Shelves of folded cotton astar linings, silk brocades, and golden gota patti borders at Deeksha Matching Center"
                 referrerPolicy="no-referrer"
                 onError={() => setImageError(true)}
