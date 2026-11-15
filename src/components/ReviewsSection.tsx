@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { ArrowUpRight, Star } from 'lucide-react';
 import type { CustomerReview, ReviewSummary, ShopDetails } from '../types.ts';
 import { validateReviewInput } from '../utils/tailoring.ts';
-import { publishReviewToRtdb } from '../utils/firebaseRtdb.ts';
+import { publishNewReviewToRtdb } from '../utils/firebaseRtdb.ts';
 
 interface ReviewsSectionProps {
   reviews: CustomerReview[];
@@ -56,21 +56,26 @@ export function ReviewsSection({
 
     setSubmitting(true);
     try {
-      const reviewPayload = {
+      const reviewInput = {
         customerName: customerName.trim(),
         rating: Number(rating),
         service: service.trim(),
         comment: comment.trim(),
       };
 
-      let created: CustomerReview | undefined;
+      // Write directly to Firebase RTDB (/reviews) using push()/set() without requiring login
+      const rtdbResult = await publishNewReviewToRtdb(reviewInput);
+      let created = rtdbResult.review;
       let serverSummary: ReviewSummary | undefined;
 
       try {
         const res = await fetch('/api/reviews', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(reviewPayload),
+          body: JSON.stringify({
+            id: created.id,
+            ...reviewInput,
+          }),
         });
         const data = (await res.json()) as {
           review?: CustomerReview;
@@ -79,34 +84,23 @@ export function ReviewsSection({
         if (res.ok && data.review) {
           created = data.review;
           serverSummary = data.reviewSummary;
+        } else if (!rtdbResult.ok) {
+          setFormError('Could not save your review right now. Please try again.');
+          return;
         }
       } catch {
-        // Fallback directly to Firebase RTDB if local server is unreachable
+        if (!rtdbResult.ok) {
+          setFormError('Network error while saving your review.');
+          return;
+        }
       }
-
-      if (!created) {
-        created = {
-          id: `rev-${Date.now()}`,
-          customerName: reviewPayload.customerName,
-          rating: reviewPayload.rating,
-          service: reviewPayload.service,
-          comment: reviewPayload.comment,
-          source: 'Website Customer',
-          visitDate: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
-          visible: true,
-          featured: false,
-          createdAt: new Date().toISOString(),
-        };
-      }
-
-      await publishReviewToRtdb(created);
 
       onReviewAdded(created, serverSummary);
       setCustomerName('');
       setRating(5);
       setComment('');
       setShowForm(false);
-      setFormSuccess('Thank you! Your customer review is now published across all devices.');
+      setFormSuccess('Thank you! Your customer review is now published.');
     } catch {
       setFormError('Network error while saving your review.');
     } finally {

@@ -67,8 +67,10 @@ export function CostEstimatorSection({
                 id="est-garment"
                 value={effectiveGarmentId}
                 onChange={(e) => setGarmentId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white border border-stone-300 focus:border-rose-800 rounded-lg text-sm font-medium text-stone-900 outline-none"
+                disabled={garments.length === 0}
+                className="w-full px-3.5 py-2.5 bg-white border border-stone-300 focus:border-rose-800 rounded-lg text-sm font-medium text-stone-900 outline-none disabled:opacity-60"
               >
+                {garments.length === 0 && <option value="">No garments configured</option>}
                 {garments.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name} — {formatCurrencyINR(g.basePrice)}
@@ -85,8 +87,10 @@ export function CostEstimatorSection({
                 id="est-speed"
                 value={effectiveTurnaroundId}
                 onChange={(e) => setTurnaroundId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white border border-stone-300 focus:border-rose-800 rounded-lg text-sm font-medium text-stone-900 outline-none"
+                disabled={turnarounds.length === 0}
+                className="w-full px-3.5 py-2.5 bg-white border border-stone-300 focus:border-rose-800 rounded-lg text-sm font-medium text-stone-900 outline-none disabled:opacity-60"
               >
+                {turnarounds.length === 0 && <option value="">Standard</option>}
                 {turnarounds.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} {t.fee > 0 ? `(+${formatCurrencyINR(t.fee)})` : '· Regular'}

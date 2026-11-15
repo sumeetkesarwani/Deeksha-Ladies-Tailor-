@@ -189,12 +189,22 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
           )}
 
           {hasSearched && results.length === 0 && !searchError && (
-            <div className="pt-4 border-t border-stone-200 text-sm text-stone-600">
-              No active order matched <strong className="text-stone-900">{query}</strong>. Double-check your Bill Number or 10-digit mobile number, or call our counter at{' '}
-              <a href={`tel:${shopDetails.whatsappDigits}`} className="font-semibold text-rose-800 hover:underline">
-                {shopDetails.phone}
+            <div className="pt-4 border-t border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-stone-600">
+              <p>
+                No active order matched <strong className="text-stone-900">{query}</strong>. Double-check your Bill Number or 10-digit mobile number, or call our counter at{' '}
+                <a href={`tel:${shopDetails.whatsappDigits}`} className="font-semibold text-rose-800 hover:underline">
+                  {shopDetails.phone}
+                </a>
+                .
+              </p>
+              <a
+                href={buildOrderInquiryWhatsAppUrl(shopDetails.whatsappDigits, { orderNo: query.trim() || 'Status Check' })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0"
+              >
+                Send WhatsApp Message
               </a>
-              .
             </div>
           )}
 
@@ -213,8 +223,10 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
                             order.status === 'Ready'
                               ? 'text-emerald-700'
                               : order.status === 'Delivered'
-                                ? 'text-stone-600'
-                                : 'text-amber-700'
+                                ? 'text-stone-700'
+                                : order.status === 'Partial Delivered'
+                                  ? 'text-sky-700'
+                                  : 'text-amber-700'
                           }`}
                         >
                           {order.status === 'Ready' || order.status === 'Delivered' ? (
@@ -234,7 +246,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
                             </span>
                             <span aria-hidden="true">·</span>
                             <span className={item.isDelivered ? 'text-emerald-700 font-medium' : 'text-amber-700 font-medium'}>
-                              {item.isDelivered ? 'Ready' : 'In Stitching'}
+                              {item.isDelivered ? 'Delivered' : 'In Stitching'}
                             </span>
                           </li>
                         ))}

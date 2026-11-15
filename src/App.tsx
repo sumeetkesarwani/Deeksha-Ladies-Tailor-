@@ -111,6 +111,8 @@ export default function App() {
   });
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [activeView, setActiveView] = useState<'public' | 'dashboard'>('public');
+  const cloudShopLoadedRef = useRef(false);
+  const cloudCatalogLoadedRef = useRef(false);
 
   const reviewSummary = useMemo(
     () =>
@@ -126,11 +128,13 @@ export default function App() {
   useEffect(() => {
     const loadPublic = async () => {
       try {
-        const res = await fetch('/api/public/bootstrap');
+        const res = await fetch('/api/public/bootstrap', { cache: 'no-store' });
         if (!res.ok) return;
         const data = (await res.json()) as PublicBootstrapPayload;
-        setShopDetails(data.shopDetails);
-        if (data.catalog) {
+        if (!cloudShopLoadedRef.current && data.shopDetails) {
+          setShopDetails(data.shopDetails);
+        }
+        if (!cloudCatalogLoadedRef.current && data.catalog) {
           setCatalog(data.catalog);
         }
         if (Array.isArray(data.reviews) && data.reviews.length > 0) {
@@ -150,6 +154,16 @@ export default function App() {
     };
 
     void loadPublic();
+    const pollInterval = window.setInterval(() => {
+      void loadPublic();
+    }, 15000);
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void loadPublic();
+      }
+    };
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
 
     const unsubStorefront = subscribePublicStorefrontRtdb({
       getBaselineReviews: () => baselineReviewsRef.current,
@@ -157,9 +171,11 @@ export default function App() {
         setReviews(mergedReviews);
       },
       onShopDetailsUpdate: (cloudShop) => {
+        cloudShopLoadedRef.current = true;
         setShopDetails(cloudShop);
       },
       onCatalogUpdate: (cloudCatalog) => {
+        cloudCatalogLoadedRef.current = true;
         setCatalog(cloudCatalog);
       },
     });
@@ -210,6 +226,9 @@ export default function App() {
     });
 
     return () => {
+      window.clearInterval(pollInterval);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       unsubStorefront();
       unsubscribeAuth();
     };

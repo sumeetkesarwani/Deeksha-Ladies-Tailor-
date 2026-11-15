@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildDirectEnquiryWhatsAppUrl,
   calculateStitchingEstimate,
   computeOrderBalance,
   computeReviewSummary,
@@ -41,6 +42,22 @@ test('calculateStitchingEstimate uses custom owner-configured catalog prices', (
   });
   assert.equal(res.total, 790);
   assert.equal(res.garmentName, 'Silk Designer Blouse');
+});
+
+test('calculateStitchingEstimate does not fall back to hardcoded defaults when cloud catalog is empty', () => {
+  const res = calculateStitchingEstimate({
+    garmentId: 'alite-blouse',
+    turnaroundId: 'express',
+    addonIds: ['cups'],
+    catalog: {
+      estimatorGarments: [],
+      estimatorTurnarounds: [],
+      estimatorAddons: [],
+    },
+  });
+  assert.equal(res.basePrice, 0);
+  assert.equal(res.turnaroundFee, 0);
+  assert.equal(res.total, 0);
 });
 
 test('computeOrderBalance clamps non-negative balance', () => {
@@ -235,4 +252,14 @@ test('computeReviewSummary blends directory base reviews with new visible websit
   const summary = computeReviewSummary(reviews, 4.8, 35, 'https://share.google/zbgBH15WaKYkn3CG8');
   assert.equal(summary.totalReviewsCount, 36);
   assert.equal(summary.averageRating, 4.8);
+});
+
+test('buildDirectEnquiryWhatsAppUrl formats direct WhatsApp enquiry links cleanly', () => {
+  const url = buildDirectEnquiryWhatsAppUrl('917449531663', {
+    name: 'Priya',
+    notes: '2 Prince Cut Blouses',
+  });
+  assert.ok(url.startsWith('https://api.whatsapp.com/send?phone=917449531663&text='));
+  assert.ok(decodeURIComponent(url).includes('Priya'));
+  assert.ok(decodeURIComponent(url).includes('2 Prince Cut Blouses'));
 });

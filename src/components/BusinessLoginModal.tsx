@@ -3,7 +3,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Eye, EyeOff, Lock, X } from 'lucide-react';
 import { firebaseAuth } from '../firebase.ts';
 import type { AuthUser } from '../types.ts';
-import { formatAdminLoginEmail } from '../utils/firebaseSyncHelpers.ts';
+import { formatAdminLoginEmail, getAdminLoginEmailCandidates } from '../utils/firebaseSyncHelpers.ts';
 
 interface BusinessLoginModalProps {
   open: boolean;
@@ -45,20 +45,44 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
     e.preventDefault();
     setError('');
 
-    const email = formatAdminLoginEmail(identifier);
-    if (!email || !password) {
+    const candidates = getAdminLoginEmailCandidates(identifier);
+    if (candidates.length === 0 || !password) {
       setError('Please enter your 10-digit mobile number or Admin email ID and password.');
       return;
     }
 
     setLoading(true);
     try {
-      const credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      const idToken = await credential.user.getIdToken();
+      let signedInUser: { email: string | null; displayName: string | null; getIdToken: () => Promise<string> } | null = null;
+      let signedInEmail = candidates[0];
+      let lastErr: unknown = null;
+
+      for (let i = 0; i < candidates.length; i++) {
+        const candidateEmail = candidates[i];
+        try {
+          const credential = await signInWithEmailAndPassword(firebaseAuth, candidateEmail, password);
+          signedInUser = credential.user;
+          signedInEmail = credential.user.email || candidateEmail;
+          break;
+        } catch (err: unknown) {
+          lastErr = err;
+          const code = (err as { code?: string })?.code;
+          const canRetryAlternative = code === 'auth/user-not-found' || code === 'auth/invalid-credential';
+          if (!canRetryAlternative || i === candidates.length - 1) {
+            throw err;
+          }
+        }
+      }
+
+      if (!signedInUser) {
+        throw lastErr;
+      }
+
+      const idToken = await signedInUser.getIdToken();
 
       let serverUser: AuthUser = {
-        businessId: credential.user.email || email,
-        ownerName: credential.user.displayName || 'Deeksha Boutique Admin',
+        businessId: signedInEmail,
+        ownerName: signedInUser.displayName || 'Deeksha Boutique Admin',
       };
       let sessionToken = '';
 
@@ -137,7 +161,7 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
               autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g. 7449531663 or 7449531663@deekshaladiestailor.com"
+              placeholder="e.g. 7449531663 or admin@deekshatailors.com"
               className="w-full px-3.5 py-2.5 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none"
             />
             {formattedPreview && (

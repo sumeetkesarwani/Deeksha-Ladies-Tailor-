@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import type {
   AddonOption,
@@ -21,6 +21,10 @@ type CatalogSection = 'services' | 'estimator' | 'matching' | 'patterns';
 export function CatalogEditorTab({ catalog, saving, onSaveCatalog }: CatalogEditorTabProps) {
   const [draft, setDraft] = useState<CatalogConfig>(catalog);
   const [section, setSection] = useState<CatalogSection>('services');
+
+  useEffect(() => {
+    setDraft(catalog);
+  }, [catalog]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import { get, onValue, ref, remove, set, update, type Unsubscribe } from 'firebase/database';
+import { get, onValue, push, ref, remove, set, update, type Unsubscribe } from 'firebase/database';
 import { rtdb } from '../firebase.ts';
 import type { CatalogConfig, CustomerReview, FittingAppointment, ShopDetails } from '../types.ts';
 import type { TrackedOrderResult } from './tailoring.ts';
@@ -7,7 +7,9 @@ import {
   extractRtdbRecords,
   filterCustomerPublicOrders,
   mergeReviewsWithCloud,
+  parseRtdbServicesSnapshot,
   sanitizeRtdbKey,
+  serializeCatalogForRtdbServices,
   sortOrdersByNumberDesc,
   stripUndefined,
 } from './firebaseSyncHelpers.ts';
@@ -29,6 +31,39 @@ export async function queryPublicOrdersFromRtdb(searchQuery: string): Promise<Tr
   }
   const records = extractRtdbRecords(snapshot.val());
   return filterCustomerPublicOrders(records, searchQuery);
+}
+
+/**
+ * Creates a brand-new customer review directly in Firebase RTDB (/reviews) using push()/set()
+ * without requiring login so any customer review saves immediately to the cloud.
+ */
+export async function publishNewReviewToRtdb(input: {
+  customerName: string;
+  rating: number;
+  service: string;
+  comment: string;
+}): Promise<{ ok: boolean; review: CustomerReview }> {
+  const newRef = push(ref(rtdb, 'reviews'));
+  const reviewId = newRef.key || `rev-${Date.now()}`;
+  const review: CustomerReview = {
+    id: reviewId,
+    customerName: input.customerName.trim(),
+    rating: Number(input.rating),
+    service: input.service.trim(),
+    comment: input.comment.trim(),
+    source: 'Website Customer',
+    visitDate: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+    visible: true,
+    featured: false,
+    createdAt: new Date().toISOString(),
+  };
+
+  try {
+    await set(newRef, stripUndefined(review));
+    return { ok: true, review };
+  } catch {
+    return { ok: false, review };
+  }
 }
 
 /**
@@ -62,17 +97,17 @@ export async function syncAllReviewsToRtdb(reviews: CustomerReview[]): Promise<b
 }
 
 export async function deleteReviewFromRtdb(reviewId: string, remainingReviews?: CustomerReview[]): Promise<boolean> {
-  try {
-    if (remainingReviews) {
-      await syncAllReviewsToRtdb(remainingReviews);
-    } else {
-      await remove(ref(rtdb, `reviews/${sanitizeRtdbKey(reviewId)}`));
-      await set(ref(rtdb, 'site/reviewsInitialized'), true);
-    }
-    return true;
-  } catch {
-    return false;
+  const safeKey = sanitizeRtdbKey(reviewId);
+  if (remainingReviews) {
+    const multiOk = await syncAllReviewsToRtdb(remainingReviews);
+    if (multiOk) return true;
   }
+
+  const [removeRes] = await Promise.allSettled([
+    remove(ref(rtdb, `reviews/${safeKey}`)),
+    set(ref(rtdb, 'site/reviewsInitialized'), true),
+  ]);
+  return removeRes.status === 'fulfilled';
 }
 
 export async function saveShopDetailsToRtdb(shopDetails: ShopDetails): Promise<boolean> {
@@ -84,13 +119,18 @@ export async function saveShopDetailsToRtdb(shopDetails: ShopDetails): Promise<b
   }
 }
 
+/**
+ * Saves live service offerings & estimator pricing directly to Firebase RTDB `/services`
+ * (and mirrors to `/site/catalog`), returning true if Firebase accepts `/services` or `/site/catalog`.
+ */
 export async function saveCatalogToRtdb(catalog: CatalogConfig): Promise<boolean> {
-  try {
-    await set(ref(rtdb, 'site/catalog'), stripUndefined(catalog));
-    return true;
-  } catch {
-    return false;
-  }
+  const servicesPayload = serializeCatalogForRtdbServices(catalog);
+  const siteCatalogPayload = stripUndefined(catalog);
+  const results = await Promise.allSettled([
+    set(ref(rtdb, 'services'), servicesPayload),
+    set(ref(rtdb, 'site/catalog'), siteCatalogPayload),
+  ]);
+  return results.some((r) => r.status === 'fulfilled');
 }
 
 export async function saveAppointmentToRtdb(appointment: FittingAppointment): Promise<boolean> {
@@ -121,8 +161,8 @@ export function subscribeAppointmentsRtdb(
 }
 
 /**
- * Subscribes to live public storefront updates from Firebase RTDB (`reviews`, `site/shopDetails`, `site/catalog`)
- * so customer reviews and Admin edits appear across all devices without needing reloads.
+ * Subscribes to live public storefront updates from Firebase RTDB (`services`, `reviews`, `site/shopDetails`, `site/catalog`)
+ * so pricing edits and customer reviews appear in real time across all devices without falling back to hardcoded defaults.
  */
 export function subscribePublicStorefrontRtdb(options: {
   getBaselineReviews: () => CustomerReview[];
@@ -135,6 +175,7 @@ export function subscribePublicStorefrontRtdb(options: {
   let latestCloudReviews: unknown[] = [];
   let reviewsInitialized = false;
   let hasReviewsSnapshot = false;
+  let hasCloudServices = false;
 
   const emitMergedReviews = () => {
     if (!hasReviewsSnapshot && !reviewsInitialized) return;
@@ -145,6 +186,21 @@ export function subscribePublicStorefrontRtdb(options: {
     });
     onReviewsUpdate(merged);
   };
+
+  const unsubServices = onValue(
+    ref(rtdb, 'services'),
+    (snapshot) => {
+      if (!snapshot.exists()) return;
+      const parsed = parseRtdbServicesSnapshot(snapshot.val());
+      if (parsed.initialized) {
+        hasCloudServices = true;
+        onCatalogUpdate(parsed.catalog);
+      }
+    },
+    () => {
+      // Keep fallback/server catalog if Firebase read fails
+    },
+  );
 
   const unsubReviews = onValue(
     ref(rtdb, 'reviews'),
@@ -176,13 +232,11 @@ export function subscribePublicStorefrontRtdb(options: {
       if (siteVal.shopDetails && typeof siteVal.shopDetails === 'object' && siteVal.shopDetails.businessName) {
         onShopDetailsUpdate(siteVal.shopDetails);
       }
-      if (
-        siteVal.catalog &&
-        typeof siteVal.catalog === 'object' &&
-        Array.isArray(siteVal.catalog.estimatorGarments) &&
-        siteVal.catalog.estimatorGarments.length > 0
-      ) {
-        onCatalogUpdate(siteVal.catalog);
+      if (!hasCloudServices && siteVal.catalog && typeof siteVal.catalog === 'object') {
+        const parsed = parseRtdbServicesSnapshot(siteVal.catalog);
+        if (parsed.initialized) {
+          onCatalogUpdate(parsed.catalog);
+        }
       }
     },
     () => {
@@ -191,6 +245,7 @@ export function subscribePublicStorefrontRtdb(options: {
   );
 
   return () => {
+    unsubServices();
     unsubReviews();
     unsubSite();
   };

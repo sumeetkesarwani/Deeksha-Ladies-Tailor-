@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   Calendar,
   LogOut,
@@ -119,13 +119,23 @@ export function BusinessDashboard({
   const attendanceSyncRef = useRef<RtdbCollectionController<Record<string, unknown>> | null>(null);
   const productionSyncRef = useRef<RtdbCollectionController<Record<string, unknown>> | null>(null);
 
-  const authHeaders = useMemo(
-    () => ({
+  const getAdminHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    }),
-    [authToken],
-  );
+    };
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+    try {
+      const idToken = await firebaseAuth.currentUser?.getIdToken();
+      if (idToken) {
+        headers['X-Firebase-Id-Token'] = idToken;
+      }
+    } catch {
+      // ignore token refresh edge case
+    }
+    return headers;
+  }, [authToken]);
 
   const refreshBillingIframeFromStorage = useCallback(() => {
     const win = billingIframeRef.current?.contentWindow as BillingIframeWindow | null;
@@ -260,7 +270,8 @@ export function BusinessDashboard({
   }, [refreshBillingIframeFromStorage]);
 
   const loadOverview = async () => {
-    if (!authToken) {
+    const headers = await getAdminHeaders();
+    if (!headers.Authorization && !headers['X-Firebase-Id-Token']) {
       setLoading(false);
       return;
     }
@@ -268,7 +279,7 @@ export function BusinessDashboard({
     setError('');
     try {
       const res = await fetch('/api/admin/overview', {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers,
       });
       if (res.status === 401) {
         setLoading(false);
@@ -370,15 +381,20 @@ export function BusinessDashboard({
     setAppointments((prev) => prev.map((a) => (a.id === id ? updated : a)));
 
     try {
-      await saveAppointmentToRtdb(updated);
-      if (authToken) {
-        await fetch(`/api/admin/appointments/${id}`, {
+      const headers = await getAdminHeaders();
+      const [rtdbOk, serverRes] = await Promise.all([
+        saveAppointmentToRtdb(updated),
+        fetch(`/api/admin/appointments/${id}`, {
           method: 'PATCH',
-          headers: authHeaders,
+          headers,
           body: JSON.stringify({ status }),
-        });
+        }).catch(() => null),
+      ]);
+      if (!rtdbOk && !serverRes?.ok) {
+        setError('Could not update appointment.');
+        return;
       }
-      flashNotice(`Appointment updated to ${status} across all devices.`);
+      flashNotice(`Appointment updated to ${status}.`);
     } catch {
       setError('Could not update appointment.');
     }
@@ -410,15 +426,24 @@ export function BusinessDashboard({
     onReviewsUpdated(nextReviews);
 
     try {
-      await syncAllReviewsToRtdb(nextReviews);
-      if (authToken) {
-        await fetch(`/api/admin/reviews/${id}`, {
+      const headers = await getAdminHeaders();
+      const [rtdbOk, serverRes] = await Promise.all([
+        syncAllReviewsToRtdb(nextReviews),
+        fetch(`/api/admin/reviews/${id}`, {
           method: 'PATCH',
-          headers: authHeaders,
+          headers,
           body: JSON.stringify(payload),
-        });
+        }).catch(() => null),
+      ]);
+      if (!rtdbOk && !serverRes?.ok) {
+        setError('Could not update review.');
+        return;
       }
-      flashNotice('Review updated and synced across all devices.');
+      flashNotice(
+        rtdbOk
+          ? 'Review updated and synced across all devices.'
+          : 'Review updated on server (enable Firebase /reviews rules for instant cloud sync).',
+      );
     } catch {
       setError('Could not update review.');
     }
@@ -430,14 +455,19 @@ export function BusinessDashboard({
     onReviewsUpdated(remaining);
 
     try {
-      await deleteReviewFromRtdb(id, remaining);
-      if (authToken) {
-        await fetch(`/api/admin/reviews/${id}`, {
+      const headers = await getAdminHeaders();
+      const [rtdbOk, serverRes] = await Promise.all([
+        deleteReviewFromRtdb(id, remaining),
+        fetch(`/api/admin/reviews/${id}`, {
           method: 'DELETE',
-          headers: authHeaders,
-        });
+          headers,
+        }).catch(() => null),
+      ]);
+      if (!rtdbOk && !serverRes?.ok) {
+        setError('Could not delete review.');
+        return;
       }
-      flashNotice('Review deleted across all devices.');
+      flashNotice('Review deleted.');
     } catch {
       setError('Could not delete review.');
     }
@@ -448,26 +478,35 @@ export function BusinessDashboard({
     if (!shopForm) return;
     setError('');
     try {
+      const headers = await getAdminHeaders();
       let finalShop = shopForm;
-      if (authToken) {
-        try {
-          const res = await fetch('/api/admin/shop', {
-            method: 'PUT',
-            headers: authHeaders,
-            body: JSON.stringify(shopForm),
-          });
-          const data = (await res.json()) as { shopDetails?: ShopDetails };
-          if (res.ok && data.shopDetails) {
-            finalShop = data.shopDetails;
-          }
-        } catch {
-          // continue syncing to RTDB
+      let serverOk = false;
+      try {
+        const res = await fetch('/api/admin/shop', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(shopForm),
+        });
+        const data = (await res.json()) as { shopDetails?: ShopDetails };
+        if (res.ok && data.shopDetails) {
+          finalShop = data.shopDetails;
+          serverOk = true;
         }
+      } catch {
+        // continue syncing to RTDB
       }
-      await saveShopDetailsToRtdb(finalShop);
+      const rtdbOk = await saveShopDetailsToRtdb(finalShop);
+      if (!rtdbOk && !serverOk) {
+        setError('Could not save shop details. Please check your connection and try again.');
+        return;
+      }
       setShopForm(finalShop);
       onShopUpdated(finalShop);
-      flashNotice('Shop details & Google links synced across all devices.');
+      flashNotice(
+        rtdbOk
+          ? 'Shop details & Google links synced across all devices.'
+          : 'Shop details saved on server (enable Firebase /site rules for instant cloud sync).',
+      );
     } catch {
       setError('Error saving shop details.');
     }
@@ -477,26 +516,35 @@ export function BusinessDashboard({
     setError('');
     setSavingCatalog(true);
     try {
+      const headers = await getAdminHeaders();
       let finalCatalog = nextCatalog;
-      if (authToken) {
-        try {
-          const res = await fetch('/api/admin/catalog', {
-            method: 'PUT',
-            headers: authHeaders,
-            body: JSON.stringify(nextCatalog),
-          });
-          const data = (await res.json()) as { catalog?: CatalogConfig };
-          if (res.ok && data.catalog) {
-            finalCatalog = data.catalog;
-          }
-        } catch {
-          // continue syncing to RTDB
+      let serverOk = false;
+      try {
+        const res = await fetch('/api/admin/catalog', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(nextCatalog),
+        });
+        const data = (await res.json()) as { catalog?: CatalogConfig; error?: string };
+        if (res.ok && data.catalog) {
+          finalCatalog = data.catalog;
+          serverOk = true;
         }
+      } catch {
+        // continue syncing to RTDB
       }
-      await saveCatalogToRtdb(finalCatalog);
+      const rtdbOk = await saveCatalogToRtdb(finalCatalog);
+      if (!rtdbOk && !serverOk) {
+        setError('Could not save prices & services. Please sign in again and retry.');
+        return;
+      }
       setCatalog(finalCatalog);
       onCatalogUpdated(finalCatalog);
-      flashNotice('All services, estimator prices, and rates synced across all devices.');
+      flashNotice(
+        rtdbOk
+          ? 'All services, estimator prices, and rates synced across all devices.'
+          : 'Prices saved on server (enable Firebase /site rules for instant cloud sync).',
+      );
     } catch {
       setError('Error saving pricing and services.');
     } finally {

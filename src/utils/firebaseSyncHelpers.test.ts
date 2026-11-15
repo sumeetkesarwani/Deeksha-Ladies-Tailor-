@@ -5,16 +5,29 @@ import {
   extractRtdbRecords,
   filterCustomerPublicOrders,
   formatAdminLoginEmail,
+  getAdminLoginEmailCandidates,
   mergeReviewsWithCloud,
+  parseRtdbServicesSnapshot,
   sanitizeRtdbKey,
+  serializeCatalogForRtdbServices,
 } from './firebaseSyncHelpers.ts';
+import { DEFAULT_CATALOG } from './tailoring.ts';
 
-test('formatAdminLoginEmail appends @deekshaladiestailor.com when no @ is typed and preserves full emails', () => {
-  assert.equal(formatAdminLoginEmail('7449531663'), '7449531663@deekshaladiestailor.com');
-  assert.equal(formatAdminLoginEmail('+91 74495 31663'), '7449531663@deekshaladiestailor.com');
-  assert.equal(formatAdminLoginEmail('owner@deekshaladiestailor.com'), 'owner@deekshaladiestailor.com');
-  assert.equal(formatAdminLoginEmail('deeksha_admin'), 'deeksha_admin@deekshaladiestailor.com');
+test('formatAdminLoginEmail appends @deekshatailors.com when no @ is typed and preserves full emails', () => {
+  assert.equal(formatAdminLoginEmail('7449531663'), '7449531663@deekshatailors.com');
+  assert.equal(formatAdminLoginEmail('+91 74495 31663'), '7449531663@deekshatailors.com');
+  assert.equal(formatAdminLoginEmail('7449531663@deekshaladiestailor.com'), '7449531663@deekshaladiestailor.com');
+  assert.equal(formatAdminLoginEmail('deeksha_admin'), 'deeksha_admin@deekshatailors.com');
   assert.equal(formatAdminLoginEmail('   '), '');
+});
+
+test('getAdminLoginEmailCandidates tries @deekshatailors.com first and includes legacy domain fallback', () => {
+  assert.deepEqual(getAdminLoginEmailCandidates('7449531663'), [
+    '7449531663@deekshatailors.com',
+    '7449531663@deekshaladiestailor.com',
+  ]);
+  assert.deepEqual(getAdminLoginEmailCandidates('owner@custom.com'), ['owner@custom.com']);
+  assert.deepEqual(getAdminLoginEmailCandidates('   '), []);
 });
 
 test('filterCustomerPublicOrders searches by Bill No or 10-digit mobile and hides measurements & financial totals', () => {
@@ -118,11 +131,45 @@ test('computeRtdbCollectionPatch never overwrites cloud data with empty list and
   assert.deepEqual(patchDelete, { 'ord-2': null });
 });
 
-test('extractRtdbRecords and sanitizeRtdbKey normalize RTDB structures safely', () => {
+test('extractRtdbRecords and sanitizeRtdbKey normalize RTDB structures and preserve push() keys', () => {
   assert.deepEqual(extractRtdbRecords(null), []);
   assert.equal(extractRtdbRecords([{ id: '1' }, null]).length, 1);
-  assert.equal(extractRtdbRecords({ a: { id: '1' }, b: { id: '2' } }).length, 2);
+  const pushed = extractRtdbRecords<{ id?: string; customerName?: string }>({
+    '-NpushKey123': { customerName: 'Riya' },
+    _meta: { v: 1 },
+  });
+  assert.equal(pushed.length, 1);
+  assert.equal(pushed[0].id, '-NpushKey123');
   assert.equal(sanitizeRtdbKey('2026-11-15/stf.1#a'), '2026-11-15_stf_1_a');
+});
+
+test('parseRtdbServicesSnapshot treats cloud /services data as authoritative without hardcoded fallback', () => {
+  const serialized = serializeCatalogForRtdbServices({
+    ...DEFAULT_CATALOG,
+    services: [
+      {
+        number: '01',
+        title: 'Custom Bridal Blouse',
+        description: 'Cloud rate',
+        startingPrice: 999,
+        highlights: ['Cloud sync'],
+      },
+    ],
+    estimatorAddons: [],
+  });
+  const parsed = parseRtdbServicesSnapshot(serialized);
+  assert.equal(parsed.initialized, true);
+  assert.equal(parsed.catalog.services.length, 1);
+  assert.equal(parsed.catalog.services[0].startingPrice, 999);
+  assert.equal(parsed.catalog.estimatorAddons.length, 0);
+
+  // Explicit empty array once initialized in cloud MUST NOT revert to DEFAULT_CATALOG
+  const clearedServices = parseRtdbServicesSnapshot({
+    catalogInitialized: true,
+    services: [],
+  });
+  assert.equal(clearedServices.initialized, true);
+  assert.equal(clearedServices.catalog.services.length, 0);
 });
 
 test('mergeReviewsWithCloud keeps baseline reviews when uninitialized and uses cloud authority when initialized', () => {

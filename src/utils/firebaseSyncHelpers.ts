@@ -1,5 +1,15 @@
-import type { CustomerReview } from '../types.ts';
+import type {
+  AddonOption,
+  CatalogConfig,
+  CustomerReview,
+  DesignPattern,
+  GarmentOption,
+  MatchingRateItem,
+  ServiceOffering,
+  TurnaroundOption,
+} from '../types.ts';
 import {
+  DEFAULT_CATALOG,
   mapBillingHtmlOrders,
   normalizeIndianPhone,
   toTrackedOrderResult,
@@ -12,7 +22,7 @@ export const PRODUCTION_STORAGE_KEY = 'deeksha_production_registry_v1';
 
 /**
  * Formats an Admin login identifier for Firebase Email/Password authentication.
- * If no '@' is present, normalizes phone digits (or identifier) and appends '@deekshaladiestailor.com'.
+ * If no '@' is present, normalizes phone digits (or identifier) and appends '@deekshatailors.com'.
  */
 export function formatAdminLoginEmail(identifier: string): string {
   const trimmed = identifier.trim();
@@ -22,9 +32,24 @@ export function formatAdminLoginEmail(identifier: string): string {
   const digits = trimmed.replace(/\D/g, '');
   if (digits.length >= 10) {
     const normalizedPhone = normalizeIndianPhone(trimmed);
-    return `${normalizedPhone}@deekshaladiestailor.com`;
+    return `${normalizedPhone}@deekshatailors.com`;
   }
-  return `${trimmed.replace(/\s+/g, '')}@deekshaladiestailor.com`;
+  return `${trimmed.replace(/\s+/g, '')}@deekshatailors.com`;
+}
+
+/**
+ * Returns candidate emails when signing in with a mobile number or username without '@',
+ * checking '@deekshatailors.com' first and falling back to '@deekshaladiestailor.com'.
+ */
+export function getAdminLoginEmailCandidates(identifier: string): string[] {
+  const trimmed = identifier.trim();
+  if (!trimmed) return [];
+  if (trimmed.includes('@')) return [trimmed];
+
+  const primary = formatAdminLoginEmail(trimmed);
+  const localPart = primary.split('@')[0];
+  if (!localPart) return [];
+  return Array.from(new Set([primary, `${localPart}@deekshaladiestailor.com`]));
 }
 
 export function sanitizeRtdbKey(rawKey: string): string {
@@ -59,11 +84,144 @@ export function extractRtdbRecords<T extends object = Record<string, unknown>>(s
     return snapshotVal.filter((item): item is T => Boolean(item && typeof item === 'object'));
   }
   if (typeof snapshotVal === 'object') {
-    return Object.values(snapshotVal as Record<string, unknown>).filter((item): item is T =>
-      Boolean(item && typeof item === 'object'),
-    );
+    const out: T[] = [];
+    for (const [key, val] of Object.entries(snapshotVal as Record<string, unknown>)) {
+      if (key === '_meta' || !val || typeof val !== 'object') continue;
+      const obj = val as Record<string, unknown>;
+      if (!obj.id) {
+        out.push({ id: key, ...obj } as T);
+      } else {
+        out.push(obj as T);
+      }
+    }
+    return out;
   }
   return [];
+}
+
+function normalizeServiceOfferings(raw: unknown): ServiceOffering[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    .map((s, idx) => ({
+      number: String(s.number ?? String(idx + 1).padStart(2, '0')).trim() || String(idx + 1).padStart(2, '0'),
+      title: String(s.title ?? '').trim(),
+      description: String(s.description ?? '').trim(),
+      startingPrice: Math.max(0, Number(s.startingPrice) || 0),
+      highlights: Array.isArray(s.highlights)
+        ? s.highlights.map((h) => String(h).trim()).filter(Boolean)
+        : [],
+    }))
+    .filter((s) => s.title.length > 0);
+}
+
+export function serializeCatalogForRtdbServices(catalog: CatalogConfig): Record<string, unknown> {
+  return stripUndefined({
+    catalogInitialized: true,
+    updatedAt: new Date().toISOString(),
+    services: catalog.services,
+    designPatterns: catalog.designPatterns,
+    matchingRates: catalog.matchingRates,
+    estimatorGarments: catalog.estimatorGarments,
+    estimatorTurnarounds: catalog.estimatorTurnarounds,
+    estimatorAddons: catalog.estimatorAddons,
+  });
+}
+
+/**
+ * Parses Firebase RTDB `/services` snapshot into a full CatalogConfig.
+ * Once cloud data exists (`catalogInitialized` or structured fields), cloud values
+ * are treated as authoritative and never fall back to hardcoded defaults.
+ */
+export function parseRtdbServicesSnapshot(
+  rawVal: unknown,
+  fallbackCatalog: CatalogConfig = DEFAULT_CATALOG,
+): { initialized: boolean; catalog: CatalogConfig } {
+  if (!rawVal || typeof rawVal !== 'object') {
+    return { initialized: false, catalog: fallbackCatalog };
+  }
+
+  // Case 1: Array of ServiceOffering stored directly under /services
+  if (Array.isArray(rawVal)) {
+    const services = normalizeServiceOfferings(rawVal);
+    return {
+      initialized: true,
+      catalog: {
+        ...fallbackCatalog,
+        services,
+      },
+    };
+  }
+
+  const obj = rawVal as Record<string, unknown>;
+  const hasCatalogKeys =
+    obj.catalogInitialized === true ||
+    'services' in obj ||
+    'estimatorGarments' in obj ||
+    'matchingRates' in obj ||
+    'designPatterns' in obj;
+
+  if (hasCatalogKeys) {
+    const services = 'services' in obj
+      ? normalizeServiceOfferings(obj.services)
+      : fallbackCatalog.services;
+
+    const designPatterns = Array.isArray(obj.designPatterns)
+      ? (obj.designPatterns as DesignPattern[]).filter((p) => p && typeof p.name === 'string' && p.name.trim())
+      : 'designPatterns' in obj
+        ? []
+        : fallbackCatalog.designPatterns;
+
+    const matchingRates = Array.isArray(obj.matchingRates)
+      ? (obj.matchingRates as MatchingRateItem[]).filter((m) => m && typeof m.name === 'string' && m.name.trim())
+      : 'matchingRates' in obj
+        ? []
+        : fallbackCatalog.matchingRates;
+
+    const estimatorGarments = Array.isArray(obj.estimatorGarments)
+      ? (obj.estimatorGarments as GarmentOption[]).filter((g) => g && typeof g.name === 'string' && g.name.trim())
+      : 'estimatorGarments' in obj
+        ? []
+        : fallbackCatalog.estimatorGarments;
+
+    const estimatorTurnarounds = Array.isArray(obj.estimatorTurnarounds)
+      ? (obj.estimatorTurnarounds as TurnaroundOption[]).filter((t) => t && typeof t.name === 'string' && t.name.trim())
+      : 'estimatorTurnarounds' in obj
+        ? []
+        : fallbackCatalog.estimatorTurnarounds;
+
+    const estimatorAddons = Array.isArray(obj.estimatorAddons)
+      ? (obj.estimatorAddons as AddonOption[]).filter((a) => a && typeof a.label === 'string' && a.label.trim())
+      : 'estimatorAddons' in obj
+        ? []
+        : fallbackCatalog.estimatorAddons;
+
+    return {
+      initialized: true,
+      catalog: {
+        services,
+        designPatterns,
+        matchingRates,
+        estimatorGarments,
+        estimatorTurnarounds,
+        estimatorAddons,
+      },
+    };
+  }
+
+  // Case 2: Map of keyed ServiceOffering objects { key: { title, startingPrice, ... } }
+  const mapItems = normalizeServiceOfferings(Object.values(obj));
+  if (mapItems.length > 0) {
+    return {
+      initialized: true,
+      catalog: {
+        ...fallbackCatalog,
+        services: mapItems,
+      },
+    };
+  }
+
+  return { initialized: false, catalog: fallbackCatalog };
 }
 
 /**

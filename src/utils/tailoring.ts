@@ -158,9 +158,9 @@ export interface EstimateResult {
 }
 
 export function calculateStitchingEstimate(input: EstimateInput): EstimateResult {
-  const garments = input.catalog?.estimatorGarments?.length ? input.catalog.estimatorGarments : GARMENT_OPTIONS;
-  const turnarounds = input.catalog?.estimatorTurnarounds?.length ? input.catalog.estimatorTurnarounds : TURNAROUND_OPTIONS;
-  const addons = input.catalog?.estimatorAddons ?? ADDON_OPTIONS;
+  const garments = input.catalog ? input.catalog.estimatorGarments : GARMENT_OPTIONS;
+  const turnarounds = input.catalog ? input.catalog.estimatorTurnarounds : TURNAROUND_OPTIONS;
+  const addons = input.catalog ? input.catalog.estimatorAddons : ADDON_OPTIONS;
 
   const garment = garments.find((g) => g.id === input.garmentId) ?? garments[0];
   const turnaround = turnarounds.find((t) => t.id === input.turnaroundId) ?? turnarounds[0];
@@ -168,27 +168,32 @@ export function calculateStitchingEstimate(input: EstimateInput): EstimateResult
   const uniqueAddonIds = Array.from(new Set(input.addonIds));
   const selectedAddons = addons.filter((a) => uniqueAddonIds.includes(a.id));
 
+  const garmentName = garment?.name ?? 'Custom Garment';
+  const basePrice = garment?.basePrice ?? 0;
+  const turnaroundFee = turnaround?.fee ?? 0;
   const addonsTotal = selectedAddons.reduce((sum, item) => sum + item.price, 0);
-  const total = garment.basePrice + turnaround.fee + addonsTotal;
+  const total = basePrice + turnaroundFee + addonsTotal;
   const selectedAddonLabels = selectedAddons.map((a) => a.shortLabel || a.label);
 
-  let summary = garment.name;
+  let summary = garmentName;
   if (selectedAddonLabels.length > 0) {
     summary += ` + ${selectedAddonLabels.join(', ')}`;
   }
-  if (turnaround.fee > 0) {
-    summary += ` (${turnaround.name})`;
-  } else {
-    summary += ` · ${turnaround.name}`;
+  if (turnaround) {
+    if (turnaround.fee > 0) {
+      summary += ` (${turnaround.name})`;
+    } else {
+      summary += ` · ${turnaround.name}`;
+    }
   }
 
   const digits = (input.whatsappDigits ?? '917449531663').replace(/\D/g, '') || '917449531663';
   const waMsg = `Hello Deeksha Tailors, I calculated an estimate on your website for *${summary}* (Estimated Total: *₹${total}*). I would like to book an appointment!`;
 
   return {
-    garmentName: garment.name,
-    basePrice: garment.basePrice,
-    turnaroundFee: turnaround.fee,
+    garmentName,
+    basePrice,
+    turnaroundFee,
     addonsTotal,
     total,
     selectedAddonLabels,
@@ -473,4 +478,22 @@ export function buildOrderInquiryWhatsAppUrl(
     ? `Hi Deeksha Tailors, I am checking status for Bill #${order.orderNo} (${order.customerName}).`
     : `Hi Deeksha Tailors, I am checking status for Bill #${order.orderNo}.`;
   return `https://api.whatsapp.com/send?phone=${digits}&text=${encodeURIComponent(msg)}`;
+}
+
+export function buildDirectEnquiryWhatsAppUrl(
+  whatsappDigits: string,
+  details?: { name?: string; phone?: string; date?: string; timeSlot?: string; notes?: string },
+): string {
+  const digits = whatsappDigits.replace(/\D/g, '') || '917449531663';
+  const lines = ['Hello Deeksha Ladies Tailor & Matching Center, I have an enquiry:'];
+  if (details?.name?.trim()) lines.push(`Name: ${details.name.trim()}`);
+  if (details?.phone?.trim()) lines.push(`Mobile: ${details.phone.trim()}`);
+  if (details?.date?.trim()) lines.push(`Preferred Date: ${details.date.trim()}`);
+  if (details?.timeSlot?.trim()) lines.push(`Preferred Time: ${details.timeSlot.trim()}`);
+  if (details?.notes?.trim()) {
+    lines.push(`Requirements / Enquiry: ${details.notes.trim()}`);
+  } else {
+    lines.push('I would like to enquire about stitching / matching fabrics.');
+  }
+  return `https://api.whatsapp.com/send?phone=${digits}&text=${encodeURIComponent(lines.join('\n'))}`;
 }

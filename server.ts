@@ -21,6 +21,7 @@ import {
   validateAppointmentInput,
   validateReviewInput,
 } from './src/utils/tailoring.ts';
+import { serializeCatalogForRtdbServices } from './src/utils/firebaseSyncHelpers.ts';
 
 interface OwnerAccount {
   businessId: string;
@@ -44,10 +45,46 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json');
 const SESSION_SECRET = process.env.SESSION_SECRET || 'deeksha_tailors_rajarhat_session_key_2026';
 const COOKIE_NAME = 'deeksha_owner_session';
 const FIREBASE_RTDB_URL = 'https://deeksha-ladies-tailors-default-rtdb.firebaseio.com';
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyDA7qYT7x85-w4EV6DUCj5B5Iciwj3CZQQ';
 
-async function mirrorToFirebaseRtdb(rtdbPath: string, method: 'PUT' | 'DELETE', data?: unknown): Promise<void> {
+async function verifyFirebaseIdToken(
+  idToken: string,
+): Promise<{ localId: string; email?: string; displayName?: string } | null> {
+  if (!idToken) return null;
   try {
-    const url = `${FIREBASE_RTDB_URL}/${rtdbPath}.json`;
+    const verifyRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_WEB_API_KEY)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      },
+    );
+    if (!verifyRes.ok) return null;
+    const verifyData = (await verifyRes.json()) as {
+      users?: Array<{ localId?: string; email?: string; displayName?: string }>;
+    };
+    const fbUser = verifyData.users?.[0];
+    if (!fbUser?.localId) return null;
+    return {
+      localId: fbUser.localId,
+      email: fbUser.email,
+      displayName: fbUser.displayName,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function mirrorToFirebaseRtdb(
+  rtdbPath: string,
+  method: 'PUT' | 'DELETE',
+  data?: unknown,
+  firebaseIdToken?: string,
+): Promise<void> {
+  try {
+    const query = firebaseIdToken ? `?auth=${encodeURIComponent(firebaseIdToken)}` : '';
+    const url = `${FIREBASE_RTDB_URL}/${rtdbPath}.json${query}`;
     await fetch(url, {
       method,
       headers: method === 'PUT' ? { 'Content-Type': 'application/json' } : undefined,
@@ -227,19 +264,35 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
-function requireOwnerAuth(req: Request, res: Response, next: NextFunction): void {
+function extractFirebaseIdToken(req: Request): string | undefined {
+  const header = req.headers['x-firebase-id-token'];
+  if (typeof header === 'string' && header.trim()) {
+    return header.trim();
+  }
+  return undefined;
+}
+
+async function requireOwnerAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = extractToken(req);
-  if (!token) {
-    res.status(401).json({ error: 'Authentication required. Please log in with your Business ID and password.' });
-    return;
-  }
-  const verified = verifySessionToken(token);
   const store = loadStore();
-  if (!verified || verified.businessId !== store.owner.businessId) {
-    res.status(401).json({ error: 'Session expired or invalid. Please log in again.' });
-    return;
+  if (token) {
+    const verified = verifySessionToken(token);
+    if (verified && verified.businessId === store.owner.businessId) {
+      next();
+      return;
+    }
   }
-  next();
+
+  const fbToken = extractFirebaseIdToken(req) || token || '';
+  if (fbToken) {
+    const fbUser = await verifyFirebaseIdToken(fbToken);
+    if (fbUser) {
+      next();
+      return;
+    }
+  }
+
+  res.status(401).json({ error: 'Authentication required. Please sign in to the Admin Dashboard.' });
 }
 
 async function startServer(): Promise<void> {
@@ -316,11 +369,14 @@ async function startServer(): Promise<void> {
 
   app.post('/api/reviews', (req, res) => {
     const body = req.body as {
+      id?: string;
       customerName?: string;
       rating?: number;
       service?: string;
       comment?: string;
     };
+    const requestedId = String(body.id ?? '').trim();
+    const safeId = /^[a-zA-Z0-9_-]{4,80}$/.test(requestedId) ? requestedId : `rev-${Date.now()}`;
     const customerName = String(body.customerName ?? '').trim();
     const rating = Number(body.rating);
     const service = String(body.service ?? '').trim();
@@ -334,7 +390,7 @@ async function startServer(): Promise<void> {
 
     const store = loadStore();
     const created: CustomerReview = {
-      id: `rev-${Date.now()}`,
+      id: safeId,
       customerName,
       rating,
       service,
@@ -345,7 +401,7 @@ async function startServer(): Promise<void> {
       featured: false,
       createdAt: new Date().toISOString(),
     };
-    store.reviews.unshift(created);
+    store.reviews = [created, ...store.reviews.filter((r) => r.id !== created.id)];
     saveStore(store);
     void mirrorToFirebaseRtdb(`reviews/${created.id}`, 'PUT', created);
 
@@ -559,7 +615,7 @@ async function startServer(): Promise<void> {
       apt.status = body.status;
     }
     saveStore(store);
-    void mirrorToFirebaseRtdb(`appointments/${apt.id}`, 'PUT', apt);
+    void mirrorToFirebaseRtdb(`appointments/${apt.id}`, 'PUT', apt, extractFirebaseIdToken(req));
     res.json({ appointment: apt });
   });
 
@@ -579,7 +635,7 @@ async function startServer(): Promise<void> {
     if (typeof body.featured === 'boolean') review.featured = body.featured;
     if (typeof body.ownerReply === 'string') review.ownerReply = body.ownerReply.trim() || undefined;
     saveStore(store);
-    void mirrorToFirebaseRtdb(`reviews/${review.id}`, 'PUT', review);
+    void mirrorToFirebaseRtdb(`reviews/${review.id}`, 'PUT', review, extractFirebaseIdToken(req));
     res.json({ review });
   });
 
@@ -592,7 +648,7 @@ async function startServer(): Promise<void> {
       return;
     }
     saveStore(store);
-    void mirrorToFirebaseRtdb(`reviews/${req.params.id}`, 'DELETE');
+    void mirrorToFirebaseRtdb(`reviews/${req.params.id}`, 'DELETE', undefined, extractFirebaseIdToken(req));
     res.json({ ok: true });
   });
 
@@ -623,7 +679,7 @@ async function startServer(): Promise<void> {
           : prev.baseDirectoryReviewCount,
     };
     saveStore(store);
-    void mirrorToFirebaseRtdb('site/shopDetails', 'PUT', store.shopDetails);
+    void mirrorToFirebaseRtdb('site/shopDetails', 'PUT', store.shopDetails, extractFirebaseIdToken(req));
     res.json({ shopDetails: store.shopDetails });
   });
 
@@ -716,7 +772,9 @@ async function startServer(): Promise<void> {
       estimatorAddons,
     };
     saveStore(store);
-    void mirrorToFirebaseRtdb('site/catalog', 'PUT', store.catalog);
+    const firebaseToken = extractFirebaseIdToken(req);
+    void mirrorToFirebaseRtdb('services', 'PUT', serializeCatalogForRtdbServices(store.catalog), firebaseToken);
+    void mirrorToFirebaseRtdb('site/catalog', 'PUT', store.catalog, firebaseToken);
     res.json({ catalog: store.catalog });
   });
 

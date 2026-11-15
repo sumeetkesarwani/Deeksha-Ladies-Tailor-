@@ -66,6 +66,11 @@ export function ServicesAndCatalog({ services, designPatterns }: ServicesAndCata
                 </div>
               </div>
             ))}
+            {services.length === 0 && (
+              <div className="py-10 text-sm text-stone-500 text-center">
+                No tailoring services are listed right now. Contact the boutique for custom stitching rates.
+              </div>
+            )}
           </div>
         </div>
 
