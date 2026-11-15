@@ -9,16 +9,15 @@ import type {
   CatalogConfig,
   CustomerReview,
   FittingAppointment,
-  OrderStatus,
   ShopDetails,
   TailoringOrder,
 } from './src/types.ts';
 import {
   DEFAULT_CATALOG,
-  computeOrderBalance,
   computeReviewSummary,
   filterOrders,
-  normalizeIndianPhone,
+  mapBillingHtmlOrders,
+  toTrackedOrderResult,
   validateAppointmentInput,
   validateReviewInput,
 } from './src/utils/tailoring.ts';
@@ -232,7 +231,7 @@ function requireOwnerAuth(req: Request, res: Response, next: NextFunction): void
 async function startServer(): Promise<void> {
   loadStore();
   const app = express();
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '2mb' }));
 
   // --- Public API Routes ---
   app.get('/api/public/bootstrap', (_req, res) => {
@@ -259,19 +258,7 @@ async function startServer(): Promise<void> {
       return;
     }
     const store = loadStore();
-    const matches = filterOrders(store.orders, q).map((order) => ({
-      id: order.id,
-      orderNo: order.orderNo,
-      customerName: order.customerName,
-      phoneMasked: order.phone.length >= 4 ? `••••••${order.phone.slice(-4)}` : order.phone,
-      items: order.items,
-      totalAmount: order.totalAmount,
-      advancePaid: order.advancePaid,
-      balance: order.balance,
-      deliveryDate: order.deliveryDate,
-      status: order.status,
-      notes: order.notes,
-    }));
+    const matches = filterOrders(store.orders, q).map(toTrackedOrderResult);
     res.json({ orders: matches });
   });
 
@@ -415,6 +402,55 @@ async function startServer(): Promise<void> {
     res.json({ ok: true });
   });
 
+  app.post('/api/auth/firebase-session', async (req, res) => {
+    const body = req.body as { idToken?: string };
+    const idToken = String(body.idToken ?? '').trim();
+    if (!idToken) {
+      res.status(400).json({ error: 'Firebase ID token is required.' });
+      return;
+    }
+
+    const firebaseApiKey = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyDA7qYT7x85-w4EV6DUCj5B5Iciwj3CZQQ';
+    try {
+      const verifyRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseApiKey)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        },
+      );
+      if (!verifyRes.ok) {
+        res.status(401).json({ error: 'Invalid Firebase session token.' });
+        return;
+      }
+      const verifyData = (await verifyRes.json()) as {
+        users?: Array<{ localId?: string; email?: string; displayName?: string }>;
+      };
+      const fbUser = verifyData.users?.[0];
+      if (!fbUser?.localId) {
+        res.status(401).json({ error: 'Firebase user not found.' });
+        return;
+      }
+
+      const store = loadStore();
+      const token = createSessionToken(store.owner.businessId);
+      res.setHeader(
+        'Set-Cookie',
+        `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
+      );
+      res.json({
+        token,
+        user: {
+          businessId: fbUser.email || fbUser.localId,
+          ownerName: fbUser.displayName || 'Deeksha Boutique Admin',
+        },
+      });
+    } catch {
+      res.status(502).json({ error: 'Could not verify Firebase session.' });
+    }
+  });
+
   app.put('/api/auth/credentials', requireOwnerAuth, (req, res) => {
     const body = req.body as {
       currentPassword?: string;
@@ -483,109 +519,16 @@ async function startServer(): Promise<void> {
     });
   });
 
-  app.post('/api/admin/orders', requireOwnerAuth, (req, res) => {
-    const body = req.body as {
-      orderNo?: string;
-      customerName?: string;
-      phone?: string;
-      itemDesc?: string;
-      qty?: number;
-      totalAmount?: number;
-      advancePaid?: number;
-      deliveryDate?: string;
-      status?: OrderStatus;
-      notes?: string;
-    };
-
-    const customerName = String(body.customerName ?? '').trim();
-    const phone = normalizeIndianPhone(String(body.phone ?? ''));
-    const itemDesc = String(body.itemDesc ?? '').trim();
-    const qty = Math.max(1, Number(body.qty) || 1);
-    const totalAmount = Math.max(0, Number(body.totalAmount) || 0);
-    const advancePaid = Math.max(0, Number(body.advancePaid) || 0);
-
-    if (customerName.length < 2 || !/^[6-9]\d{9}$/.test(phone) || itemDesc.length < 2) {
-      res.status(400).json({ error: 'Customer name, valid 10-digit phone, and garment description are required.' });
+  app.put('/api/admin/orders/sync', requireOwnerAuth, (req, res) => {
+    const body = req.body as { orders?: unknown };
+    if (!Array.isArray(body.orders)) {
+      res.status(400).json({ error: 'orders array is required.' });
       return;
     }
-
     const store = loadStore();
-    const nextNo =
-      String(body.orderNo ?? '').trim() ||
-      String(
-        store.orders.reduce((max, o) => {
-          const n = Number(o.orderNo);
-          return Number.isFinite(n) && n > max ? n : max;
-        }, 100) + 1,
-      );
-
-    const created: TailoringOrder = {
-      id: `ord-${Date.now()}`,
-      orderNo: nextNo,
-      customerName,
-      phone,
-      items: [{ id: `itm-${Date.now()}`, desc: itemDesc, qty, isDelivered: body.status === 'Ready' || body.status === 'Delivered' }],
-      totalAmount,
-      advancePaid,
-      balance: computeOrderBalance(totalAmount, advancePaid),
-      deliveryDate: String(body.deliveryDate ?? '').trim() || 'Within 4–5 Days',
-      status: body.status || 'Booked',
-      notes: String(body.notes ?? '').trim() || undefined,
-      createdAt: new Date().toISOString(),
-    };
-    store.orders.unshift(created);
+    store.orders = mapBillingHtmlOrders(body.orders);
     saveStore(store);
-    res.status(201).json({ order: created });
-  });
-
-  app.patch('/api/admin/orders/:id', requireOwnerAuth, (req, res) => {
-    const { id } = req.params;
-    const body = req.body as {
-      status?: OrderStatus;
-      advancePaid?: number;
-      deliveryDate?: string;
-      toggleItemId?: string;
-    };
-    const store = loadStore();
-    const order = store.orders.find((o) => o.id === id);
-    if (!order) {
-      res.status(404).json({ error: 'Order not found.' });
-      return;
-    }
-
-    if (body.status) {
-      order.status = body.status;
-      if (body.status === 'Ready' || body.status === 'Delivered') {
-        order.items = order.items.map((it) => ({ ...it, isDelivered: true }));
-      }
-    }
-    if (typeof body.advancePaid === 'number') {
-      order.advancePaid = Math.max(0, body.advancePaid);
-      order.balance = computeOrderBalance(order.totalAmount, order.advancePaid);
-    }
-    if (typeof body.deliveryDate === 'string' && body.deliveryDate.trim()) {
-      order.deliveryDate = body.deliveryDate.trim();
-    }
-    if (body.toggleItemId) {
-      order.items = order.items.map((it) =>
-        it.id === body.toggleItemId ? { ...it, isDelivered: !it.isDelivered } : it,
-      );
-    }
-
-    saveStore(store);
-    res.json({ order });
-  });
-
-  app.delete('/api/admin/orders/:id', requireOwnerAuth, (req, res) => {
-    const store = loadStore();
-    const before = store.orders.length;
-    store.orders = store.orders.filter((o) => o.id !== req.params.id);
-    if (store.orders.length === before) {
-      res.status(404).json({ error: 'Order not found.' });
-      return;
-    }
-    saveStore(store);
-    res.json({ ok: true });
+    res.json({ count: store.orders.length });
   });
 
   app.patch('/api/admin/appointments/:id', requireOwnerAuth, (req, res) => {

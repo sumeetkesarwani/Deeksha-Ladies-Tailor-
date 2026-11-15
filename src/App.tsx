@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { firebaseAuth } from './firebase.ts';
 import type {
   AuthUser,
   CatalogConfig,
@@ -78,42 +80,78 @@ export default function App() {
       }
     };
 
-    const verifySession = async () => {
-      try {
-        const headers: Record<string, string> = {};
-        if (authToken) headers.Authorization = `Bearer ${authToken}`;
-        const res = await fetch('/api/auth/me', { headers });
-        if (!res.ok) return;
-        const data = (await res.json()) as { authenticated: boolean; user: AuthUser | null };
-        if (data.authenticated && data.user) {
-          setAuthUser(data.user);
-        } else if (authToken) {
+    void loadPublic();
+
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (fbUser) => {
+      if (!fbUser) {
+        try {
           localStorage.removeItem(TOKEN_STORAGE_KEY);
-          setAuthToken('');
+        } catch {
+          // ignore storage error
+        }
+        setAuthUser(null);
+        setAuthToken('');
+        setActiveView('public');
+        return;
+      }
+
+      const fallbackUser: AuthUser = {
+        businessId: fbUser.email || fbUser.uid,
+        ownerName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Deeksha Admin',
+      };
+      setAuthUser(fallbackUser);
+
+      try {
+        const idToken = await fbUser.getIdToken();
+        const res = await fetch('/api/auth/firebase-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { token?: string; user?: AuthUser };
+          if (data.token) {
+            try {
+              localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+            } catch {
+              // ignore storage error
+            }
+            setAuthToken(data.token);
+          }
+          if (data.user) {
+            setAuthUser(data.user);
+          }
         }
       } catch {
-        // ignore session check failure
+        // Firebase Auth remains valid for Billing & RTDB even if backend session bridge fails
       }
-    };
+    });
 
-    void loadPublic();
-    void verifySession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const handleLoginSuccess = (user: AuthUser, token: string) => {
-    try {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    } catch {
-      // ignore storage error
+    if (token) {
+      try {
+        localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      } catch {
+        // ignore storage error
+      }
+      setAuthToken(token);
     }
     setAuthUser(user);
-    setAuthToken(token);
     setLoginModalOpen(false);
     setActiveView('dashboard');
   };
 
   const handleLogout = async () => {
+    try {
+      await signOut(firebaseAuth);
+    } catch {
+      // ignore firebase signOut edge case
+    }
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
@@ -140,10 +178,11 @@ export default function App() {
         authUser={authUser}
         activeView={activeView}
         onOpenLogin={() => setLoginModalOpen(true)}
+        onLogout={() => void handleLogout()}
         onNavigateView={setActiveView}
       />
 
-      {activeView === 'dashboard' && authUser && authToken ? (
+      {activeView === 'dashboard' && authUser ? (
         <BusinessDashboard
           authUser={authUser}
           authToken={authToken}
@@ -153,15 +192,6 @@ export default function App() {
           onReviewsUpdated={(nextReviews, nextSummary) => {
             setReviews(nextReviews);
             setReviewSummary(nextSummary);
-          }}
-          onCredentialsUpdated={(nextUser, nextToken) => {
-            try {
-              localStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
-            } catch {
-              // ignore storage error
-            }
-            setAuthUser(nextUser);
-            setAuthToken(nextToken);
           }}
         />
       ) : (

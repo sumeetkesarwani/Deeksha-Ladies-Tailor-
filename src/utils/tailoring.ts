@@ -197,6 +197,153 @@ export function calculateStitchingEstimate(input: EstimateInput): EstimateResult
   };
 }
 
+export const BILLING_STORAGE_KEY = 'deeksha_orders_registry_v1';
+
+export interface TrackedOrderResult {
+  id: string;
+  orderNo: string;
+  items: TailoringOrder['items'];
+  balance: number;
+  deliveryDate: string;
+  status: OrderStatus;
+}
+
+const VALID_ORDER_STATUSES: ReadonlySet<OrderStatus> = new Set([
+  'Booked',
+  'In Progress',
+  'Ready',
+  'Partial Delivered',
+  'Delivered',
+]);
+
+export function mapBillingHtmlOrders(raw: unknown): TailoringOrder[] {
+  let parsed: unknown = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const result: TailoringOrder[] = [];
+
+  for (let idx = 0; idx < parsed.length; idx++) {
+    const entry = parsed[idx];
+    if (!entry || typeof entry !== 'object') continue;
+    const rec = entry as Record<string, unknown>;
+
+    const orderNo = String(rec.orderNo ?? '').trim();
+    const customerName = String(rec.customerName ?? '').trim();
+    const phone = normalizeIndianPhone(String(rec.phone ?? ''));
+
+    if (!orderNo && !customerName && !phone) continue;
+
+    const rawItems = Array.isArray(rec.items) ? rec.items : [];
+    const items = rawItems
+      .filter((it): it is Record<string, unknown> => Boolean(it && typeof it === 'object'))
+      .map((it, itemIdx) => ({
+        id: String(it.id ?? '').trim() || `itm-${idx}-${itemIdx}`,
+        desc: String(it.desc ?? 'Tailoring Item').trim() || 'Tailoring Item',
+        qty: Math.max(1, Number(it.qty) || 1),
+        isDelivered: Boolean(it.isDelivered),
+      }));
+
+    const rawItemTotals = rawItems.reduce((sum: number, it) => {
+      if (!it || typeof it !== 'object') return sum;
+      const itemObj = it as Record<string, unknown>;
+      const t = Number(itemObj.total);
+      if (Number.isFinite(t)) return sum + Math.max(0, t);
+      const q = Math.max(1, Number(itemObj.qty) || 1);
+      const r = Number(itemObj.rate) || 0;
+      return sum + Math.max(0, q * r);
+    }, 0);
+
+    const discount = Math.max(0, Number(rec.discount) || 0);
+    let totalAmount = 0;
+    if (typeof rec.subtotal === 'number' && Number.isFinite(rec.subtotal)) {
+      totalAmount = Math.max(0, rec.subtotal - discount);
+    } else if (typeof rec.totalAmount === 'number' && Number.isFinite(rec.totalAmount)) {
+      totalAmount = Math.max(0, rec.totalAmount);
+    } else {
+      totalAmount = Math.max(0, rawItemTotals - discount);
+    }
+
+    let advancePaid = 0;
+    if (typeof rec.totalPaid === 'number' && Number.isFinite(rec.totalPaid)) {
+      advancePaid = Math.max(0, rec.totalPaid);
+    } else if (rec.advance !== undefined || rec.finalPaid !== undefined) {
+      advancePaid = Math.max(0, (Number(rec.advance) || 0) + (Number(rec.finalPaid) || 0));
+    } else if (typeof rec.advancePaid === 'number' && Number.isFinite(rec.advancePaid)) {
+      advancePaid = Math.max(0, rec.advancePaid);
+    }
+
+    const balance =
+      typeof rec.balance === 'number' && Number.isFinite(rec.balance)
+        ? Math.max(0, Number(rec.balance.toFixed(2)))
+        : computeOrderBalance(totalAmount, advancePaid);
+
+    const rawStatus = String(rec.status ?? '').trim() as OrderStatus;
+    const status: OrderStatus = VALID_ORDER_STATUSES.has(rawStatus) ? rawStatus : 'Booked';
+
+    const notes = String(rec.qualityNotes ?? rec.notes ?? '').trim() || undefined;
+
+    result.push({
+      id: String(rec.id ?? '').trim() || `bill-${idx}-${orderNo || 'entry'}`,
+      orderNo: orderNo || String(idx + 101),
+      customerName: customerName || 'Customer',
+      phone,
+      items,
+      totalAmount,
+      advancePaid,
+      balance,
+      deliveryDate: String(rec.deliveryDate ?? '').trim() || 'Pending',
+      status,
+      notes,
+      createdAt: String(rec.updatedAt ?? rec.createdAt ?? '').trim() || new Date().toISOString(),
+    });
+  }
+
+  return result;
+}
+
+export function toTrackedOrderResult(order: TailoringOrder): TrackedOrderResult {
+  return {
+    id: order.id,
+    orderNo: order.orderNo,
+    items: order.items,
+    balance: order.balance,
+    deliveryDate: order.deliveryDate,
+    status: order.status,
+  };
+}
+
+export function mergeTrackedOrders(
+  primaryOrders: TrackedOrderResult[],
+  secondaryOrders: TrackedOrderResult[],
+): TrackedOrderResult[] {
+  const seenIds = new Set<string>();
+  const seenOrderNos = new Set<string>();
+  const merged: TrackedOrderResult[] = [];
+
+  for (const order of [...primaryOrders, ...secondaryOrders]) {
+    const orderKey = order.orderNo.trim().toLowerCase();
+    if (seenIds.has(order.id) || (orderKey && seenOrderNos.has(orderKey))) {
+      continue;
+    }
+    seenIds.add(order.id);
+    if (orderKey) {
+      seenOrderNos.add(orderKey);
+    }
+    merged.push(order);
+  }
+
+  return merged;
+}
+
 export function computeOrderBalance(totalAmount: number, advancePaid: number): number {
   const safeTotal = Number.isFinite(totalAmount) ? Math.max(0, totalAmount) : 0;
   const safeAdvance = Number.isFinite(advancePaid) ? Math.max(0, advancePaid) : 0;
@@ -209,6 +356,7 @@ export function filterOrders(
   statusFilter: OrderStatus | 'All' = 'All',
 ): TailoringOrder[] {
   const trimmed = query.trim().toLowerCase();
+  const cleanBill = trimmed.replace(/^#+/, '');
   const digitsOnly = normalizeIndianPhone(trimmed);
 
   return orders.filter((order) => {
@@ -220,7 +368,9 @@ export function filterOrders(
     }
     const orderPhoneDigits = normalizeIndianPhone(order.phone);
     const phoneMatch = digitsOnly.length > 0 && orderPhoneDigits.includes(digitsOnly);
-    const billMatch = order.orderNo.toLowerCase() === trimmed || order.orderNo.toLowerCase().includes(trimmed);
+    const billMatch =
+      cleanBill.length > 0 &&
+      (order.orderNo.toLowerCase() === cleanBill || order.orderNo.toLowerCase().includes(cleanBill));
     const nameMatch = order.customerName.toLowerCase().includes(trimmed);
     return phoneMatch || billMatch || nameMatch;
   });
@@ -316,9 +466,11 @@ export function buildAppointmentWhatsAppUrl(
 
 export function buildOrderInquiryWhatsAppUrl(
   whatsappDigits: string,
-  order: Pick<TailoringOrder, 'orderNo' | 'customerName'>,
+  order: { orderNo: string; customerName?: string },
 ): string {
   const digits = whatsappDigits.replace(/\D/g, '') || '917449531663';
-  const msg = `Hi Deeksha Tailors, I am checking status for Bill #${order.orderNo} (${order.customerName}).`;
+  const msg = order.customerName
+    ? `Hi Deeksha Tailors, I am checking status for Bill #${order.orderNo} (${order.customerName}).`
+    : `Hi Deeksha Tailors, I am checking status for Bill #${order.orderNo}.`;
   return `https://api.whatsapp.com/send?phone=${digits}&text=${encodeURIComponent(msg)}`;
 }

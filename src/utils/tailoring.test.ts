@@ -5,7 +5,10 @@ import {
   computeOrderBalance,
   computeReviewSummary,
   filterOrders,
+  mapBillingHtmlOrders,
+  mergeTrackedOrders,
   normalizeIndianPhone,
+  toTrackedOrderResult,
   validateAppointmentInput,
   validateReviewInput,
 } from './tailoring.ts';
@@ -80,6 +83,98 @@ test('filterOrders matches phone digits, bill numbers, customer names, and statu
   assert.equal(filterOrders(sample, 'ananya').length, 1);
   assert.equal(filterOrders(sample, '', 'Ready').length, 1);
   assert.equal(filterOrders(sample, '101', 'Delivered').length, 0);
+});
+
+test('mapBillingHtmlOrders normalizes billing HTML localStorage JSON safely', () => {
+  const rawJson = JSON.stringify([
+    {
+      id: 'ord-1731-abc',
+      orderNo: '205',
+      customerName: 'Srabani Mukherjee',
+      phone: '+91 98312 55443',
+      deliveryDate: '2026-11-22',
+      status: 'Partial Delivered',
+      qualityNotes: 'Piping in gold zari',
+      items: [
+        { desc: 'Prince Cut Blouse', qty: 1, rate: 450, total: 450, isDelivered: true },
+        { desc: 'Saree Fall & Pico', qty: 2, rate: 60, total: 120, isDelivered: false },
+      ],
+      subtotal: 570,
+      discount: 20,
+      advance: 200,
+      finalPaid: 50,
+      totalPaid: 250,
+      balance: 300,
+      updatedAt: '2026-11-15T10:00:00.000Z',
+    },
+    null,
+    { bad: true },
+  ]);
+
+  const mapped = mapBillingHtmlOrders(rawJson);
+  assert.equal(mapped.length, 1);
+  assert.equal(mapped[0].orderNo, '205');
+  assert.equal(mapped[0].phone, '9831255443');
+  assert.equal(mapped[0].totalAmount, 550);
+  assert.equal(mapped[0].advancePaid, 250);
+  assert.equal(mapped[0].balance, 300);
+  assert.equal(mapped[0].status, 'Partial Delivered');
+  assert.equal(mapped[0].items.length, 2);
+  assert.equal(mapped[0].items[0].id, 'itm-0-0');
+  assert.equal(mapped[0].notes, 'Piping in gold zari');
+
+  assert.deepEqual(mapBillingHtmlOrders('not-valid-json'), []);
+});
+
+test('mergeTrackedOrders prefers primary local billing orders and deduplicates by id/orderNo', () => {
+  const local = [
+    toTrackedOrderResult({
+      id: 'ord-1',
+      orderNo: '301',
+      customerName: 'Ruma Sen',
+      phone: '9831211111',
+      items: [{ id: 'i1', desc: 'Designer Blouse', qty: 1, isDelivered: true }],
+      totalAmount: 500,
+      advancePaid: 500,
+      balance: 0,
+      deliveryDate: '2026-11-20',
+      status: 'Ready',
+      createdAt: '2026-11-15T10:00:00Z',
+    }),
+  ];
+  const server = [
+    toTrackedOrderResult({
+      id: 'ord-1-old',
+      orderNo: '301',
+      customerName: 'Ruma Sen',
+      phone: '9831211111',
+      items: [{ id: 'i1', desc: 'Designer Blouse', qty: 1, isDelivered: false }],
+      totalAmount: 500,
+      advancePaid: 200,
+      balance: 300,
+      deliveryDate: '2026-11-20',
+      status: 'Booked',
+      createdAt: '2026-11-15T09:00:00Z',
+    }),
+    toTrackedOrderResult({
+      id: 'ord-2',
+      orderNo: '302',
+      customerName: 'Puja Das',
+      phone: '9831222222',
+      items: [{ id: 'i2', desc: 'Kurti', qty: 1, isDelivered: false }],
+      totalAmount: 350,
+      advancePaid: 100,
+      balance: 250,
+      deliveryDate: '2026-11-21',
+      status: 'In Progress',
+      createdAt: '2026-11-15T09:30:00Z',
+    }),
+  ];
+
+  const merged = mergeTrackedOrders(local, server);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].status, 'Ready');
+  assert.equal(merged[1].orderNo, '302');
 });
 
 test('validateAppointmentInput checks Indian 10-digit phone and name', () => {

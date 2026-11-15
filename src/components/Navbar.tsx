@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Lock, LogOut, Menu, X } from 'lucide-react';
 import type { AuthUser } from '../types.ts';
 
 interface NavbarProps {
   authUser: AuthUser | null;
   activeView: 'public' | 'dashboard';
   onOpenLogin: () => void;
+  onLogout: () => void;
   onNavigateView: (view: 'public' | 'dashboard') => void;
 }
 
-export function Navbar({ authUser, activeView, onOpenLogin, onNavigateView }: NavbarProps) {
+export function Navbar({ authUser, activeView, onOpenLogin, onLogout, onNavigateView }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLinkClick = () => {
@@ -64,26 +65,37 @@ export function Navbar({ authUser, activeView, onOpenLogin, onNavigateView }: Na
             onClick={handleLinkClick}
             className="hover:text-stone-950 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
           >
-            Track Order
+            Check Order Status
           </a>
         </nav>
 
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {authUser ? (
-            <button
-              type="button"
-              onClick={() => onNavigateView(activeView === 'dashboard' ? 'public' : 'dashboard')}
-              className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-rose-800 hover:bg-rose-900 rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
-            >
-              {activeView === 'dashboard' ? 'View Public Site' : 'Owner Portal'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => onNavigateView(activeView === 'dashboard' ? 'public' : 'dashboard')}
+                className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-rose-800 hover:bg-rose-900 rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
+              >
+                {activeView === 'dashboard' ? 'View Public Site' : 'Admin Dashboard'}
+              </button>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-semibold text-stone-700 hover:text-stone-950 border border-stone-300 hover:bg-stone-100 rounded-lg transition-colors whitespace-nowrap shrink-0"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Admin Logout</span>
+              </button>
+            </>
           ) : (
             <button
               type="button"
               onClick={onOpenLogin}
-              className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-stone-900 hover:bg-stone-800 rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-medium text-stone-700 hover:text-stone-950 border border-stone-300 hover:border-stone-400 bg-white rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
             >
-              Business Login
+              <Lock className="w-3.5 h-3.5 text-stone-500" />
+              <span>Admin Login</span>
             </button>
           )}
 
@@ -114,7 +126,7 @@ export function Navbar({ authUser, activeView, onOpenLogin, onNavigateView }: Na
             Customer Reviews
           </a>
           <a href="#track-order" onClick={handleLinkClick} className="block py-2.5 text-sm font-semibold text-rose-800">
-            Track Order Status
+            Check Order Status
           </a>
         </nav>
       )}

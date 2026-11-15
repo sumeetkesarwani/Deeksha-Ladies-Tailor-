@@ -1,28 +1,57 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Calendar,
-  ClipboardList,
   LogOut,
-  Plus,
+  Maximize2,
+  Minimize2,
+  Receipt,
+  RotateCcw,
   Scissors,
-  Search,
   Settings,
   Star,
   Trash2,
 } from 'lucide-react';
+import { firebaseAuth } from '../firebase.ts';
 import type {
   AppointmentStatus,
   AuthUser,
   CatalogConfig,
   CustomerReview,
   FittingAppointment,
-  OrderStatus,
   ReviewSummary,
   ShopDetails,
-  TailoringOrder,
 } from '../types.ts';
-import { filterOrders, formatCurrencyINR } from '../utils/tailoring.ts';
+import { BILLING_STORAGE_KEY } from '../utils/tailoring.ts';
+import {
+  ATTENDANCE_STORAGE_KEY,
+  PRODUCTION_STORAGE_KEY,
+  STAFF_STORAGE_KEY,
+} from '../utils/firebaseSyncHelpers.ts';
+import { createRtdbCollectionSync, type RtdbCollectionController } from '../utils/firebaseRtdb.ts';
 import { CatalogEditorTab } from './CatalogEditorTab.tsx';
+
+const BILLING_HTML_PATH = '/assets/aistudio/Deeksha_Ladies_Tailors___Matching_Center_cf67b9a2.html';
+
+interface BillingIframeWindow extends Window {
+  loadAllData?: () => void;
+  setupAutoBillNumber?: () => void;
+  populateStaffSelectors?: () => void;
+  renderOrdersModalList?: (filterVal?: string) => void;
+  renderStaffList?: () => void;
+  renderAttendanceForDate?: () => void;
+  renderProductionList?: () => void;
+  calculateSalaryReport?: () => void;
+  updateHeaderQuickFinanceSnapshot?: () => void;
+  saveOrders?: () => void;
+  saveStaffData?: () => void;
+  saveAttendanceData?: () => void;
+  saveProductionData?: () => void;
+  confirmDeleteOrder?: (id: string) => void;
+  deleteStaffProfile?: (id: string) => void;
+  deleteProductionEntry?: (id: string) => void;
+  showConfirm?: (title: string, msg: string, icon: string, onConfirm?: () => void) => void;
+  __deekshaFirebaseHooked?: boolean;
+}
 
 interface BusinessDashboardProps {
   authUser: AuthUser;
@@ -31,10 +60,9 @@ interface BusinessDashboardProps {
   onShopUpdated: (shopDetails: ShopDetails) => void;
   onCatalogUpdated: (catalog: CatalogConfig) => void;
   onReviewsUpdated: (reviews: CustomerReview[], summary: ReviewSummary) => void;
-  onCredentialsUpdated: (user: AuthUser, token: string) => void;
 }
 
-type AdminTab = 'orders' | 'appointments' | 'catalog' | 'reviews' | 'settings';
+type AdminTab = 'billing' | 'appointments' | 'catalog' | 'reviews' | 'settings';
 
 export function BusinessDashboard({
   authUser,
@@ -43,52 +71,174 @@ export function BusinessDashboard({
   onShopUpdated,
   onCatalogUpdated,
   onReviewsUpdated,
-  onCredentialsUpdated,
 }: BusinessDashboardProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>('orders');
+  const [activeTab, setActiveTab] = useState<AdminTab>('billing');
+  const [billingExpanded, setBillingExpanded] = useState(false);
+  const [billingReloadKey, setBillingReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingCatalog, setSavingCatalog] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const [orders, setOrders] = useState<TailoringOrder[]>([]);
   const [appointments, setAppointments] = useState<FittingAppointment[]>([]);
   const [reviews, setReviews] = useState<CustomerReview[]>([]);
   const [shopForm, setShopForm] = useState<ShopDetails | null>(null);
   const [catalog, setCatalog] = useState<CatalogConfig | null>(null);
 
-  // Order filter & creation
-  const [orderQuery, setOrderQuery] = useState('');
-  const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatus | 'All'>('All');
-  const [showNewOrder, setShowNewOrder] = useState(false);
-  const [newBillNo, setNewBillNo] = useState('');
-  const [newCustName, setNewCustName] = useState('');
-  const [newCustPhone, setNewCustPhone] = useState('');
-  const [newItemDesc, setNewItemDesc] = useState('');
-  const [newQty, setNewQty] = useState(1);
-  const [newTotal, setNewTotal] = useState(450);
-  const [newAdvance, setNewAdvance] = useState(200);
-  const [newDeliveryDate, setNewDeliveryDate] = useState('');
-  const [newOrderStatus, setNewOrderStatus] = useState<OrderStatus>('Booked');
-
   // Review reply editing
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
 
-  // Credentials update form
-  const [credCurrentPassword, setCredCurrentPassword] = useState('');
-  const [credNewBusinessId, setCredNewBusinessId] = useState(authUser.businessId);
-  const [credNewPassword, setCredNewPassword] = useState('');
-  const [credOwnerName, setCredOwnerName] = useState(authUser.ownerName);
+  const billingIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const ordersSyncRef = useRef<RtdbCollectionController<Record<string, unknown>> | null>(null);
+  const staffSyncRef = useRef<RtdbCollectionController<Record<string, unknown>> | null>(null);
+  const attendanceSyncRef = useRef<RtdbCollectionController<Record<string, unknown>> | null>(null);
+  const productionSyncRef = useRef<RtdbCollectionController<Record<string, unknown>> | null>(null);
 
   const authHeaders = useMemo(
     () => ({
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${authToken}`,
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     }),
     [authToken],
   );
 
+  const refreshBillingIframeFromStorage = useCallback(() => {
+    const win = billingIframeRef.current?.contentWindow as BillingIframeWindow | null;
+    if (!win) return;
+    try {
+      win.loadAllData?.();
+      win.setupAutoBillNumber?.();
+      win.populateStaffSelectors?.();
+      const filterEl = win.document.getElementById('modal-orders-filter') as HTMLInputElement | null;
+      win.renderOrdersModalList?.(filterEl?.value ?? '');
+      win.renderStaffList?.();
+      win.renderAttendanceForDate?.();
+      win.renderProductionList?.();
+      win.calculateSalaryReport?.();
+      win.updateHeaderQuickFinanceSnapshot?.();
+    } catch {
+      // ignore iframe refresh edge case during initial load
+    }
+  }, []);
+
+  const attachBillingIframeSyncHooks = useCallback(() => {
+    const win = billingIframeRef.current?.contentWindow as BillingIframeWindow | null;
+    if (!win || win.__deekshaFirebaseHooked) return;
+    win.__deekshaFirebaseHooked = true;
+
+    const origSaveOrders = win.saveOrders;
+    if (typeof origSaveOrders === 'function') {
+      win.saveOrders = () => {
+        origSaveOrders();
+        void ordersSyncRef.current?.pushLocalToCloud(false);
+      };
+    }
+
+    const origSaveStaff = win.saveStaffData;
+    if (typeof origSaveStaff === 'function') {
+      win.saveStaffData = () => {
+        origSaveStaff();
+        void staffSyncRef.current?.pushLocalToCloud(false);
+      };
+    }
+
+    const origSaveAttendance = win.saveAttendanceData;
+    if (typeof origSaveAttendance === 'function') {
+      win.saveAttendanceData = () => {
+        origSaveAttendance();
+        void attendanceSyncRef.current?.pushLocalToCloud(false);
+      };
+    }
+
+    const origSaveProduction = win.saveProductionData;
+    if (typeof origSaveProduction === 'function') {
+      win.saveProductionData = () => {
+        origSaveProduction();
+        void productionSyncRef.current?.pushLocalToCloud(false);
+      };
+    }
+
+    const wrapSingleDelete = (
+      fnName: 'confirmDeleteOrder' | 'deleteStaffProfile' | 'deleteProductionEntry',
+      getController: () => RtdbCollectionController<Record<string, unknown>> | null,
+    ) => {
+      const origFn = win[fnName];
+      if (typeof origFn !== 'function') return;
+      win[fnName] = (id: string) => {
+        const origShowConfirm = win.showConfirm;
+        if (typeof origShowConfirm === 'function') {
+          win.showConfirm = (title, msg, icon, onConfirm) => {
+            win.showConfirm = origShowConfirm;
+            origShowConfirm(title, msg, icon, () => {
+              onConfirm?.();
+              void getController()?.deleteKeyFromCloud(id);
+            });
+          };
+        }
+        origFn(id);
+      };
+    };
+
+    wrapSingleDelete('confirmDeleteOrder', () => ordersSyncRef.current);
+    wrapSingleDelete('deleteStaffProfile', () => staffSyncRef.current);
+    wrapSingleDelete('deleteProductionEntry', () => productionSyncRef.current);
+
+    // Ensure freshly loaded iframe picks up any cloud data synced prior to iframe mount
+    refreshBillingIframeFromStorage();
+  }, [refreshBillingIframeFromStorage]);
+
+  useEffect(() => {
+    const ordersCtrl = createRtdbCollectionSync<Record<string, unknown>>({
+      rtdbPath: 'orders',
+      storageKey: BILLING_STORAGE_KEY,
+      getKey: (item, idx) => String(item.id ?? `ord-${idx}`),
+      onCloudApplied: refreshBillingIframeFromStorage,
+      onSyncError: () => {
+        // Keep local billing operational offline without disrupting admin entry
+      },
+    });
+    const staffCtrl = createRtdbCollectionSync<Record<string, unknown>>({
+      rtdbPath: 'staff',
+      storageKey: STAFF_STORAGE_KEY,
+      getKey: (item, idx) => String(item.id ?? `stf-${idx}`),
+      onCloudApplied: refreshBillingIframeFromStorage,
+    });
+    const attendanceCtrl = createRtdbCollectionSync<Record<string, unknown>>({
+      rtdbPath: 'attendance',
+      storageKey: ATTENDANCE_STORAGE_KEY,
+      getKey: (item, idx) =>
+        item.date && item.staffId ? `${String(item.date)}_${String(item.staffId)}` : String(item.id ?? `att-${idx}`),
+      onCloudApplied: refreshBillingIframeFromStorage,
+    });
+    const productionCtrl = createRtdbCollectionSync<Record<string, unknown>>({
+      rtdbPath: 'production',
+      storageKey: PRODUCTION_STORAGE_KEY,
+      getKey: (item, idx) => String(item.id ?? `prd-${idx}`),
+      onCloudApplied: refreshBillingIframeFromStorage,
+    });
+
+    ordersSyncRef.current = ordersCtrl;
+    staffSyncRef.current = staffCtrl;
+    attendanceSyncRef.current = attendanceCtrl;
+    productionSyncRef.current = productionCtrl;
+
+    return () => {
+      ordersCtrl.stop();
+      staffCtrl.stop();
+      attendanceCtrl.stop();
+      productionCtrl.stop();
+      ordersSyncRef.current = null;
+      staffSyncRef.current = null;
+      attendanceSyncRef.current = null;
+      productionSyncRef.current = null;
+    };
+  }, [refreshBillingIframeFromStorage]);
+
   const loadOverview = async () => {
+    if (!authToken) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -96,11 +246,10 @@ export function BusinessDashboard({
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.status === 401) {
-        onLogout();
+        setLoading(false);
         return;
       }
       const data = (await res.json()) as {
-        orders: TailoringOrder[];
         appointments: FittingAppointment[];
         reviews: CustomerReview[];
         shopDetails: ShopDetails;
@@ -112,7 +261,6 @@ export function BusinessDashboard({
         setError(data.error || 'Could not load owner portal data.');
         return;
       }
-      setOrders(data.orders);
       setAppointments(data.appointments);
       setReviews(data.reviews);
       setShopForm(data.shopDetails);
@@ -134,114 +282,11 @@ export function BusinessDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken]);
 
-  const filteredOrders = useMemo(
-    () => filterOrders(orders, orderQuery, orderStatusFilter),
-    [orders, orderQuery, orderStatusFilter],
-  );
-
-  const pendingBalanceTotal = useMemo(
-    () => orders.reduce((sum, o) => sum + (Number(o.balance) || 0), 0),
-    [orders],
-  );
-
-  const readyCount = useMemo(
-    () => orders.filter((o) => o.status === 'Ready').length,
-    [orders],
-  );
-
   const flashNotice = (msg: string) => {
     setNotice(msg);
     setTimeout(() => setNotice(''), 3000);
   };
 
-  const handleCreateOrder = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const res = await fetch('/api/admin/orders', {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          orderNo: newBillNo,
-          customerName: newCustName,
-          phone: newCustPhone,
-          itemDesc: newItemDesc,
-          qty: newQty,
-          totalAmount: newTotal,
-          advancePaid: newAdvance,
-          deliveryDate: newDeliveryDate || 'Within 4–5 Days',
-          status: newOrderStatus,
-        }),
-      });
-      const data = (await res.json()) as { order?: TailoringOrder; error?: string };
-      if (!res.ok || !data.order) {
-        setError(data.error || 'Failed to add tailoring order.');
-        return;
-      }
-      setOrders((prev) => [data.order!, ...prev]);
-      setNewBillNo('');
-      setNewCustName('');
-      setNewCustPhone('');
-      setNewItemDesc('');
-      setNewQty(1);
-      setNewTotal(450);
-      setNewAdvance(200);
-      setNewDeliveryDate('');
-      setShowNewOrder(false);
-      flashNotice(`Bill #${data.order.orderNo} created and live in Order Tracker.`);
-    } catch {
-      setError('Failed to save order.');
-    }
-  };
-
-  const handleOrderStatusChange = async (orderId: string, status: OrderStatus) => {
-    try {
-      const res = await fetch(`/api/admin/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: authHeaders,
-        body: JSON.stringify({ status }),
-      });
-      const data = (await res.json()) as { order?: TailoringOrder };
-      if (res.ok && data.order) {
-        setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order! : o)));
-        flashNotice(`Bill #${data.order.orderNo} marked ${status}.`);
-      }
-    } catch {
-      setError('Could not update order status.');
-    }
-  };
-
-  const handleMarkPaid = async (order: TailoringOrder) => {
-    try {
-      const res = await fetch(`/api/admin/orders/${order.id}`, {
-        method: 'PATCH',
-        headers: authHeaders,
-        body: JSON.stringify({ advancePaid: order.totalAmount }),
-      });
-      const data = (await res.json()) as { order?: TailoringOrder };
-      if (res.ok && data.order) {
-        setOrders((prev) => prev.map((o) => (o.id === order.id ? data.order! : o)));
-        flashNotice(`Bill #${order.orderNo} balance cleared.`);
-      }
-    } catch {
-      setError('Could not update payment.');
-    }
-  };
-
-  const handleDeleteOrder = async (order: TailoringOrder) => {
-    try {
-      const res = await fetch(`/api/admin/orders/${order.id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        setOrders((prev) => prev.filter((o) => o.id !== order.id));
-        flashNotice(`Bill #${order.orderNo} removed.`);
-      }
-    } catch {
-      setError('Could not delete order.');
-    }
-  };
 
   const handleAppointmentStatus = async (id: string, status: AppointmentStatus) => {
     try {
@@ -357,34 +402,6 @@ export function BusinessDashboard({
     }
   };
 
-  const handleUpdateCredentials = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const res = await fetch('/api/auth/credentials', {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({
-          currentPassword: credCurrentPassword,
-          newBusinessId: credNewBusinessId,
-          newPassword: credNewPassword || undefined,
-          ownerName: credOwnerName,
-        }),
-      });
-      const data = (await res.json()) as { user?: AuthUser; token?: string; error?: string };
-      if (!res.ok || !data.user || !data.token) {
-        setError(data.error || 'Could not update login credentials.');
-        return;
-      }
-      onCredentialsUpdated(data.user, data.token);
-      setCredCurrentPassword('');
-      setCredNewPassword('');
-      flashNotice('Business Login ID & password updated.');
-    } catch {
-      setError('Network error updating credentials.');
-    }
-  };
-
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#FAF8F6] flex flex-col lg:flex-row">
       {/* Sidebar */}
@@ -397,17 +414,18 @@ export function BusinessDashboard({
           </div>
 
           <nav aria-label="Owner Portal Sections" className="grid grid-cols-2 lg:grid-cols-1 gap-1.5">
+
             <button
               type="button"
-              onClick={() => setActiveTab('orders')}
+              onClick={() => setActiveTab('billing')}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                activeTab === 'orders'
+                activeTab === 'billing'
                   ? 'bg-stone-900 text-white'
                   : 'text-stone-700 hover:bg-stone-100'
               }`}
             >
-              <ClipboardList className="w-4 h-4 shrink-0" />
-              <span>Orders &amp; Bills</span>
+              <Receipt className="w-4 h-4 shrink-0" />
+              <span>Billing Software</span>
             </button>
 
             <button
@@ -459,7 +477,7 @@ export function BusinessDashboard({
               }`}
             >
               <Settings className="w-4 h-4 shrink-0" />
-              <span>Shop &amp; Login ID</span>
+              <span>Shop &amp; Account</span>
             </button>
           </nav>
         </div>
@@ -470,35 +488,52 @@ export function BusinessDashboard({
           className="flex items-center justify-center lg:justify-start gap-2 px-3 py-2.5 border border-stone-300 hover:bg-stone-50 rounded-lg text-xs sm:text-sm font-semibold text-stone-800 transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          <span>Sign Out</span>
+          <span>Admin Logout</span>
         </button>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-8 max-w-[1160px] space-y-6">
+      <main className={`flex-1 p-4 sm:p-8 space-y-6 ${activeTab === 'billing' ? 'max-w-full' : 'max-w-[1160px]'}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-4">
           <div>
             <p className="text-xs text-stone-500">
-              Owner Portal / {activeTab === 'catalog' ? 'Services & Pricing' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+              Admin Dashboard /{' '}
+              {activeTab === 'catalog'
+                ? 'Services & Pricing'
+                : activeTab === 'billing'
+                  ? 'Billing & Workshop'
+                  : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
             </p>
             <h1 className="font-display text-2xl sm:text-3xl font-semibold text-stone-950">
-              {activeTab === 'orders' && 'Tailoring Orders & Billing'}
+              {activeTab === 'billing' && 'Billing, Measurements & Staff Software'}
               {activeTab === 'appointments' && 'Customer Fitting Appointments'}
               {activeTab === 'catalog' && 'Services, Prices & Cost Estimator'}
               {activeTab === 'reviews' && 'Customer Reviews & Google Profile'}
-              {activeTab === 'settings' && 'Shop Details, Map Links & Login'}
+              {activeTab === 'settings' && 'Shop Details, Map Links & Firebase Admin'}
             </h1>
           </div>
 
-          {activeTab === 'orders' && (
-            <button
-              type="button"
-              onClick={() => setShowNewOrder((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-rose-800 hover:bg-rose-900 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{showNewOrder ? 'Close Order Form' : 'New Tailoring Bill'}</span>
-            </button>
+          {activeTab === 'billing' && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setBillingReloadKey((k) => k + 1)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-stone-300 hover:bg-stone-50 text-stone-800 text-xs sm:text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Reload</span>
+              </button>
+              {!billingExpanded && (
+                <button
+                  type="button"
+                  onClick={() => setBillingExpanded(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs sm:text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                  <span>Full Screen View</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -514,27 +549,33 @@ export function BusinessDashboard({
           </div>
         )}
 
-        {/* KPI strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-stone-200 p-4">
-            <p className="text-xs text-stone-500">Active &amp; Logged Bills</p>
-            <p className="font-mono-tabular text-2xl font-semibold text-stone-950 mt-1">{orders.length}</p>
+        {/* KPI strip (hidden inside full-height embedded billing app) */}
+        {activeTab !== 'billing' && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl border border-stone-200 p-4">
+              <p className="text-xs text-stone-500">Fitting Requests</p>
+              <p className="font-mono-tabular text-2xl font-semibold text-stone-950 mt-1">{appointments.length}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-stone-200 p-4">
+              <p className="text-xs text-stone-500">Pending Fittings</p>
+              <p className="font-mono-tabular text-2xl font-semibold text-rose-800 mt-1">
+                {appointments.filter((a) => a.status === 'Pending').length}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-stone-200 p-4">
+              <p className="text-xs text-stone-500">Catalog Services</p>
+              <p className="font-mono-tabular text-2xl font-semibold text-stone-950 mt-1">
+                {catalog?.services.length ?? 0}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-stone-200 p-4">
+              <p className="text-xs text-stone-500">Visible Reviews</p>
+              <p className="font-mono-tabular text-2xl font-semibold text-emerald-700 mt-1">
+                {reviews.filter((r) => r.visible).length}
+              </p>
+            </div>
           </div>
-          <div className="bg-white rounded-xl border border-stone-200 p-4">
-            <p className="text-xs text-stone-500">Ready for Pickup</p>
-            <p className="font-mono-tabular text-2xl font-semibold text-emerald-700 mt-1">{readyCount}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-stone-200 p-4">
-            <p className="text-xs text-stone-500">Pending Balance</p>
-            <p className="font-mono-tabular text-2xl font-semibold text-rose-800 mt-1">
-              {formatCurrencyINR(pendingBalanceTotal)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-stone-200 p-4">
-            <p className="text-xs text-stone-500">Fitting Requests</p>
-            <p className="font-mono-tabular text-2xl font-semibold text-stone-950 mt-1">{appointments.length}</p>
-          </div>
-        </div>
+        )}
 
         {loading ? (
           <div className="bg-white rounded-2xl border border-stone-200 p-8 text-sm text-stone-500">
@@ -542,272 +583,43 @@ export function BusinessDashboard({
           </div>
         ) : (
           <>
-            {/* ORDERS TAB */}
-            {activeTab === 'orders' && (
-              <div className="space-y-6">
-                {showNewOrder && (
-                  <form onSubmit={(e) => void handleCreateOrder(e)} className="bg-white rounded-2xl border border-stone-200 p-6 space-y-4">
-                    <h2 className="text-base font-semibold text-stone-950">Create New Customer Bill</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="new-bill-no" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Bill No. (Optional)
-                        </label>
-                        <input
-                          id="new-bill-no"
-                          type="text"
-                          value={newBillNo}
-                          onChange={(e) => setNewBillNo(e.target.value)}
-                          placeholder="Auto (e.g. 104)"
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="new-cust-name" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Customer Name *
-                        </label>
-                        <input
-                          id="new-cust-name"
-                          type="text"
-                          required
-                          value={newCustName}
-                          onChange={(e) => setNewCustName(e.target.value)}
-                          placeholder="e.g. Arpita Roy"
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="new-cust-phone" className="block text-xs font-semibold text-stone-700 mb-1">
-                          10-Digit Mobile *
-                        </label>
-                        <input
-                          id="new-cust-phone"
-                          type="tel"
-                          required
-                          value={newCustPhone}
-                          onChange={(e) => setNewCustPhone(e.target.value)}
-                          placeholder="e.g. 9831299999"
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
-                        />
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      <div className="sm:col-span-2">
-                        <label htmlFor="new-item-desc" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Garment Description *
-                        </label>
-                        <input
-                          id="new-item-desc"
-                          type="text"
-                          required
-                          value={newItemDesc}
-                          onChange={(e) => setNewItemDesc(e.target.value)}
-                          placeholder="e.g. Prince Cut Blouse + Cotton Astar"
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="new-qty" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Qty
-                        </label>
-                        <input
-                          id="new-qty"
-                          type="number"
-                          min={1}
-                          value={newQty}
-                          onChange={(e) => setNewQty(Number(e.target.value))}
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="new-delivery-date" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Delivery Date
-                        </label>
-                        <input
-                          id="new-delivery-date"
-                          type="date"
-                          value={newDeliveryDate}
-                          onChange={(e) => setNewDeliveryDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="new-total" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Total Amount (₹)
-                        </label>
-                        <input
-                          id="new-total"
-                          type="number"
-                          min={0}
-                          value={newTotal}
-                          onChange={(e) => setNewTotal(Number(e.target.value))}
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="new-advance" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Advance Paid (₹)
-                        </label>
-                        <input
-                          id="new-advance"
-                          type="number"
-                          min={0}
-                          value={newAdvance}
-                          onChange={(e) => setNewAdvance(Number(e.target.value))}
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="new-status" className="block text-xs font-semibold text-stone-700 mb-1">
-                          Initial Status
-                        </label>
-                        <select
-                          id="new-status"
-                          value={newOrderStatus}
-                          onChange={(e) => setNewOrderStatus(e.target.value as OrderStatus)}
-                          className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm bg-white outline-none focus:border-rose-800"
-                        >
-                          <option value="Booked">Booked</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Ready">Ready</option>
-                          <option value="Delivered">Delivered</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowNewOrder(false)}
-                        className="px-4 py-2 border border-stone-300 rounded-lg text-sm font-medium text-stone-700"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 bg-rose-800 hover:bg-rose-900 text-white rounded-lg text-sm font-semibold"
-                      >
-                        Save Order
-                      </button>
-                    </div>
-                  </form>
+            {/* BILLING SOFTWARE (EXACT UPLOADED HTML) TAB */}
+            {activeTab === 'billing' && (
+              <div
+                className={
+                  billingExpanded
+                    ? 'fixed inset-0 z-50 bg-white flex flex-col'
+                    : 'bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs flex flex-col'
+                }
+              >
+                {billingExpanded && (
+                  <div className="px-4 py-2.5 bg-stone-950 text-white flex items-center justify-between gap-3 shrink-0">
+                    <span className="text-xs sm:text-sm font-semibold">
+                      Deeksha Billing, Measurements &amp; Staff Register
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBillingExpanded(false)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-stone-950 hover:bg-stone-100 rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      <Minimize2 className="w-3.5 h-3.5" />
+                      <span>Exit Full View</span>
+                    </button>
+                  </div>
                 )}
-
-                <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-                  <div className="p-4 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="relative flex-1 max-w-sm">
-                      <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        aria-label="Filter orders by bill, customer name, or phone"
-                        value={orderQuery}
-                        onChange={(e) => setOrderQuery(e.target.value)}
-                        placeholder="Search bill #, name, or phone..."
-                        className="w-full pl-9 pr-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
-                      />
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1 p-1 bg-stone-100 rounded-lg">
-                      {(['All', 'Booked', 'In Progress', 'Ready', 'Delivered'] as const).map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => setOrderStatusFilter(status)}
-                          className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                            orderStatusFilter === status ? 'bg-white text-stone-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
-                          }`}
-                        >
-                          {status}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="border-b border-stone-200 text-xs text-stone-500 bg-stone-50">
-                        <tr>
-                          <th className="py-3 px-4 font-semibold">Bill #</th>
-                          <th className="py-3 px-4 font-semibold">Customer</th>
-                          <th className="py-3 px-4 font-semibold">Garments</th>
-                          <th className="py-3 px-4 font-semibold text-right">Total</th>
-                          <th className="py-3 px-4 font-semibold text-right">Balance</th>
-                          <th className="py-3 px-4 font-semibold">Delivery</th>
-                          <th className="py-3 px-4 font-semibold">Status</th>
-                          <th className="py-3 px-4 font-semibold text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-200">
-                        {filteredOrders.map((order) => (
-                          <tr key={order.id} className="hover:bg-stone-50/70">
-                            <td className="py-3 px-4 font-mono-tabular font-semibold text-stone-950">#{order.orderNo}</td>
-                            <td className="py-3 px-4">
-                              <div className="font-medium text-stone-900">{order.customerName}</div>
-                              <div className="font-mono-tabular text-xs text-stone-500">{order.phone}</div>
-                            </td>
-                            <td className="py-3 px-4 text-xs text-stone-700 max-w-xs">
-                              {order.items.map((it) => `${it.desc} (×${it.qty})`).join(', ')}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono-tabular text-stone-900">
-                              {formatCurrencyINR(order.totalAmount)}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono-tabular">
-                              <span className={order.balance <= 0 ? 'text-emerald-700 font-semibold' : 'text-rose-800 font-semibold'}>
-                                {order.balance <= 0 ? 'Cleared' : formatCurrencyINR(order.balance)}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 font-mono-tabular text-xs text-stone-700">{order.deliveryDate}</td>
-                            <td className="py-3 px-4">
-                              <select
-                                aria-label={`Status for Bill #${order.orderNo}`}
-                                value={order.status}
-                                onChange={(e) => void handleOrderStatusChange(order.id, e.target.value as OrderStatus)}
-                                className="px-2.5 py-1 border border-stone-300 rounded-md text-xs font-medium bg-white outline-none focus:border-rose-800"
-                              >
-                                <option value="Booked">Booked</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Ready">Ready</option>
-                                <option value="Delivered">Delivered</option>
-                              </select>
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              <div className="inline-flex items-center gap-2">
-                                {order.balance > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleMarkPaid(order)}
-                                    className="px-2.5 py-1 border border-emerald-300 text-emerald-800 hover:bg-emerald-50 rounded-md text-xs font-semibold whitespace-nowrap"
-                                  >
-                                    Clear Due
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDeleteOrder(order)}
-                                  aria-label={`Delete Bill #${order.orderNo}`}
-                                  className="p-1.5 text-stone-400 hover:text-rose-700 rounded-md"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {filteredOrders.length === 0 && (
-                          <tr>
-                            <td colSpan={8} className="py-8 text-center text-sm text-stone-500">
-                              No orders match this search or status filter.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <iframe
+                  ref={billingIframeRef}
+                  key={billingReloadKey}
+                  src={BILLING_HTML_PATH}
+                  onLoad={attachBillingIframeSyncHooks}
+                  title="Deeksha Ladies Tailors Billing & Measurement Software"
+                  className={
+                    billingExpanded
+                      ? 'w-full flex-1 border-0 bg-white'
+                      : 'w-full h-[calc(100vh-14rem)] min-h-[760px] border-0 bg-white'
+                  }
+                />
               </div>
             )}
 
@@ -1125,77 +937,34 @@ export function BusinessDashboard({
                   </div>
                 </form>
 
-                <form
-                  onSubmit={(e) => void handleUpdateCredentials(e)}
-                  className="lg:col-span-5 bg-white rounded-2xl border border-stone-200 p-6 space-y-4 h-fit"
-                >
+                <div className="lg:col-span-5 bg-white rounded-2xl border border-stone-200 p-6 space-y-4 h-fit">
                   <h2 className="text-base font-semibold text-stone-950 border-b border-stone-200 pb-3">
-                    Business Login ID &amp; Password
+                    Firebase Admin Authentication
                   </h2>
-
-                  <div>
-                    <label htmlFor="cred-owner-name" className="block text-xs font-semibold text-stone-700 mb-1">
-                      Owner Display Name
-                    </label>
-                    <input
-                      id="cred-owner-name"
-                      type="text"
-                      value={credOwnerName}
-                      onChange={(e) => setCredOwnerName(e.target.value)}
-                      className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
-                    />
+                  <div className="space-y-2 text-sm text-stone-700">
+                    <div>
+                      <span className="text-xs text-stone-500 block">Signed-in Admin Email</span>
+                      <span className="font-mono-tabular font-semibold text-stone-950">
+                        {firebaseAuth.currentUser?.email || authUser.businessId}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-stone-500 block">Firebase Project</span>
+                      <span className="font-mono-tabular text-xs text-stone-700">deeksha-ladies-tailors</span>
+                    </div>
+                    <p className="text-xs text-stone-600 pt-1">
+                      Orders, staff, attendance, and production logs sync live across devices via Firebase Realtime Database. Admin accounts and passwords are managed in Firebase Authentication.
+                    </p>
                   </div>
-
-                  <div>
-                    <label htmlFor="cred-business-id" className="block text-xs font-semibold text-stone-700 mb-1">
-                      Business Login ID
-                    </label>
-                    <input
-                      id="cred-business-id"
-                      type="text"
-                      required
-                      value={credNewBusinessId}
-                      onChange={(e) => setCredNewBusinessId(e.target.value)}
-                      className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="cred-current-pw" className="block text-xs font-semibold text-stone-700 mb-1">
-                      Current Password *
-                    </label>
-                    <input
-                      id="cred-current-pw"
-                      type="password"
-                      required
-                      value={credCurrentPassword}
-                      onChange={(e) => setCredCurrentPassword(e.target.value)}
-                      placeholder="Required to confirm changes"
-                      className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="cred-new-pw" className="block text-xs font-semibold text-stone-700 mb-1">
-                      New Password (leave blank to keep current)
-                    </label>
-                    <input
-                      id="cred-new-pw"
-                      type="password"
-                      value={credNewPassword}
-                      onChange={(e) => setCredNewPassword(e.target.value)}
-                      placeholder="Minimum 6 characters"
-                      className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
-                    />
-                  </div>
-
                   <button
-                    type="submit"
-                    className="w-full py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-sm font-semibold"
+                    type="button"
+                    onClick={onLogout}
+                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-sm font-semibold"
                   >
-                    Update Business Credentials
+                    <LogOut className="w-4 h-4" />
+                    <span>Admin Logout</span>
                   </button>
-                </form>
+                </div>
               </div>
             )}
           </>

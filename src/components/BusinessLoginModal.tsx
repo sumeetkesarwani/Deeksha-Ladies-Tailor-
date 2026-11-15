@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Eye, EyeOff, Lock, X } from 'lucide-react';
+import { firebaseAuth } from '../firebase.ts';
 import type { AuthUser } from '../types.ts';
+import { formatAdminLoginEmail } from '../utils/firebaseSyncHelpers.ts';
 
 interface BusinessLoginModalProps {
   open: boolean;
@@ -8,8 +11,27 @@ interface BusinessLoginModalProps {
   onSuccess: (user: AuthUser, token: string) => void;
 }
 
+function getFriendlyFirebaseAuthError(code?: string): string {
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Invalid Admin mobile/email or password. Please check your Firebase credentials.';
+    case 'auth/invalid-email':
+      return 'Please enter a valid 10-digit mobile number or Admin email address.';
+    case 'auth/too-many-requests':
+      return 'Too many failed sign-in attempts. Please wait a moment and try again.';
+    case 'auth/user-disabled':
+      return 'This Admin account is currently disabled in Firebase.';
+    case 'auth/network-request-failed':
+      return 'Network error connecting to Firebase Authentication. Check your internet connection.';
+    default:
+      return 'Could not sign in with Firebase Authentication. Please try again.';
+  }
+}
+
 export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginModalProps) {
-  const [businessId, setBusinessId] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,47 +39,60 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
 
   if (!open) return null;
 
+  const formattedPreview = identifier.trim() && !identifier.includes('@') ? formatAdminLoginEmail(identifier) : '';
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!businessId.trim() || !password) {
-      setError('Please enter both Business ID and Password.');
+
+    const email = formatAdminLoginEmail(identifier);
+    if (!email || !password) {
+      setError('Please enter your 10-digit mobile number or Admin email ID and password.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessId: businessId.trim(), password }),
-      });
-      const data = (await res.json()) as { user?: AuthUser; token?: string; error?: string };
-      if (!res.ok || !data.user || !data.token) {
-        setError(data.error || 'Invalid Business ID or Password.');
-        return;
+      const credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const idToken = await credential.user.getIdToken();
+
+      let serverUser: AuthUser = {
+        businessId: credential.user.email || email,
+        ownerName: credential.user.displayName || 'Deeksha Boutique Admin',
+      };
+      let sessionToken = '';
+
+      try {
+        const res = await fetch('/api/auth/firebase-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { user?: AuthUser; token?: string };
+          if (data.user) serverUser = data.user;
+          if (data.token) sessionToken = data.token;
+        }
+      } catch {
+        // Admin portal billing/workshop runs directly against Firebase Auth + RTDB even if backend session bridge fails
       }
-      onSuccess(data.user, data.token);
-      setBusinessId('');
+
+      onSuccess(serverUser, sessionToken);
+      setIdentifier('');
       setPassword('');
-    } catch {
-      setError('Network error while verifying credentials.');
+    } catch (err: unknown) {
+      const fbErr = err as { code?: string };
+      setError(getFriendlyFirebaseAuthError(fbErr?.code));
     } finally {
       setLoading(false);
     }
-  };
-
-  const fillDefaultCredentials = () => {
-    setBusinessId('deeksha_owner');
-    setPassword('Deeksha@2026');
-    setError('');
   };
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="business-login-title"
+      aria-labelledby="admin-login-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-xs p-4"
     >
       <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200 shadow-xl p-6 sm:p-8 space-y-6">
@@ -65,19 +100,19 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800">
               <Lock className="w-3.5 h-3.5" />
-              <span>Owner Access</span>
+              <span>Protected Workshop &amp; Billing Access</span>
             </div>
-            <h2 id="business-login-title" className="font-display text-2xl font-semibold text-stone-950">
-              Business Login
+            <h2 id="admin-login-title" className="font-display text-2xl font-semibold text-stone-950">
+              Admin Login
             </h2>
             <p className="text-xs text-stone-600">
-              Sign in to manage tailoring orders, fitting appointments, customer reviews, and shop details.
+              Sign in with your Admin mobile number or email ID to unlock billing, measurements, AI bill scanner, accounts, and staff management.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close login modal"
+            aria-label="Close admin login modal"
             className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg"
           >
             <X className="w-4 h-4" />
@@ -86,18 +121,23 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div>
-            <label htmlFor="login-business-id" className="block text-xs font-semibold text-stone-700 mb-1">
-              Business ID
+            <label htmlFor="login-admin-identifier" className="block text-xs font-semibold text-stone-700 mb-1">
+              Mobile Number or Admin Email ID
             </label>
             <input
-              id="login-business-id"
+              id="login-admin-identifier"
               type="text"
               autoComplete="username"
-              value={businessId}
-              onChange={(e) => setBusinessId(e.target.value)}
-              placeholder="e.g. deeksha_owner"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="e.g. 7449531663 or admin@deekshatailors.com"
               className="w-full px-3.5 py-2.5 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none"
             />
+            {formattedPreview && (
+              <p className="mt-1 text-[11px] text-stone-500 font-mono-tabular">
+                Signing in as {formattedPreview}
+              </p>
+            )}
           </div>
 
           <div>
@@ -111,7 +151,7 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter business password"
+                placeholder="Enter Firebase admin password"
                 className="w-full px-3.5 py-2.5 pr-10 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none"
               />
               <button
@@ -136,23 +176,9 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
             disabled={loading}
             className="w-full py-2.5 bg-stone-900 hover:bg-stone-800 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
           >
-            {loading ? 'Signing In...' : 'Sign In to Owner Portal'}
+            {loading ? 'Signing In...' : 'Sign In to Admin Dashboard'}
           </button>
         </form>
-
-        <div className="pt-4 border-t border-stone-200 flex items-center justify-between gap-3 text-xs text-stone-600">
-          <div>
-            <span className="block font-medium text-stone-800">Starter owner credentials</span>
-            <span className="font-mono-tabular text-stone-500">deeksha_owner / Deeksha@2026</span>
-          </div>
-          <button
-            type="button"
-            onClick={fillDefaultCredentials}
-            className="px-3 py-1.5 border border-stone-300 hover:border-stone-400 rounded-lg font-semibold text-stone-800 hover:bg-stone-50 whitespace-nowrap"
-          >
-            Fill Credentials
-          </button>
-        </div>
       </div>
     </div>
   );

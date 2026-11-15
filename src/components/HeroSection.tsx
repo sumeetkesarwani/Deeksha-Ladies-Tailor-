@@ -1,22 +1,15 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowUpRight, CheckCircle2, Clock, Search } from 'lucide-react';
-import type { ReviewSummary, ShopDetails, TailoringOrder } from '../types.ts';
-import { buildOrderInquiryWhatsAppUrl, formatCurrencyINR } from '../utils/tailoring.ts';
+import type { ReviewSummary, ShopDetails } from '../types.ts';
+import {
+  BILLING_STORAGE_KEY,
+  buildOrderInquiryWhatsAppUrl,
+  formatCurrencyINR,
+  type TrackedOrderResult,
+} from '../utils/tailoring.ts';
+import { filterCustomerPublicOrders } from '../utils/firebaseSyncHelpers.ts';
+import { queryPublicOrdersFromRtdb } from '../utils/firebaseRtdb.ts';
 import heroAtelierImg from '../assets/images/hero_tailoring_atelier_1794727216987.jpg';
-
-interface TrackedOrderResult {
-  id: string;
-  orderNo: string;
-  customerName: string;
-  phoneMasked: string;
-  items: TailoringOrder['items'];
-  totalAmount: number;
-  advancePaid: number;
-  balance: number;
-  deliveryDate: string;
-  status: TailoringOrder['status'];
-  notes?: string;
-}
 
 interface HeroSectionProps {
   shopDetails: ShopDetails;
@@ -35,25 +28,29 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
     if (e) e.preventDefault();
     const activeQuery = query.trim();
     if (!activeQuery) {
-      setSearchError('Enter a 10-digit mobile number, Bill No., or customer name.');
+      setSearchError('Enter your Bill Number or 10-digit Mobile Number.');
       setHasSearched(false);
       return;
     }
 
     setSearching(true);
     setSearchError('');
+
     try {
-      const res = await fetch(`/api/orders/track?q=${encodeURIComponent(activeQuery)}`);
-      const data = (await res.json()) as { orders?: TrackedOrderResult[]; error?: string };
-      if (!res.ok) {
-        setSearchError(data.error || 'Could not look up order.');
-        setResults([]);
-      } else {
-        setResults(data.orders ?? []);
-        setHasSearched(true);
-      }
+      const rtdbMatches = await queryPublicOrdersFromRtdb(activeQuery);
+      setResults(rtdbMatches);
+      setHasSearched(true);
     } catch {
-      setSearchError('Unable to reach order registry. Please try again.');
+      // Offline / fallback to cached same-device orders without exposing private fields
+      try {
+        const rawBilling = localStorage.getItem(BILLING_STORAGE_KEY);
+        const parsed = rawBilling ? (JSON.parse(rawBilling) as unknown[]) : [];
+        const localMatches = filterCustomerPublicOrders(parsed, activeQuery);
+        setResults(localMatches);
+        setHasSearched(true);
+      } catch {
+        setSearchError('Unable to reach order status service. Please check your connection and try again.');
+      }
     } finally {
       setSearching(false);
     }
@@ -152,19 +149,19 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
           </div>
         </div>
 
-        {/* Full-width Live Order Tracker row */}
+        {/* Full-width Live Order Status Checker connected to Firebase RTDB /orders */}
         <div id="track-order" className="bg-white rounded-2xl border border-stone-200 p-6 sm:p-8 space-y-5">
           <div className="space-y-1">
-            <h2 className="font-display text-2xl font-semibold text-stone-950">Track Your Tailoring Order</h2>
+            <h2 className="font-display text-2xl font-semibold text-stone-950">Check Order Status</h2>
             <p className="text-sm text-stone-600">
-              Enter your 10-digit phone number or Bill No. to check garment readiness, scheduled pickup date, and balance due.
+              Enter your Bill Number or 10-digit Mobile Number to view your garment status, items, delivery date, and balance due.
             </p>
           </div>
 
           <form onSubmit={(e) => void handleTrackSubmit(e)} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <label htmlFor="order-tracker-input" className="sr-only">
-                10-digit mobile number, Bill No., or customer name
+                Bill Number or 10-digit Mobile Number
               </label>
               <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -172,7 +169,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Enter 10-digit mobile number or Bill No."
+                placeholder="Enter Bill Number (e.g. 101) or 10-digit Mobile Number"
                 className="w-full pl-10 pr-4 py-2.5 border border-stone-300 focus:border-rose-800 rounded-lg text-sm text-stone-900 outline-none focus-visible:ring-2 focus-visible:ring-rose-800/20"
               />
             </div>
@@ -181,7 +178,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
               disabled={searching}
               className="px-6 py-2.5 bg-stone-900 hover:bg-stone-800 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0"
             >
-              {searching ? 'Checking...' : 'Check Status'}
+              {searching ? 'Checking...' : 'Check Order Status'}
             </button>
           </form>
 
@@ -193,7 +190,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
 
           {hasSearched && results.length === 0 && !searchError && (
             <div className="pt-4 border-t border-stone-200 text-sm text-stone-600">
-              No active bill matched <strong className="text-stone-900">{query}</strong>. Double-check your Bill No. or call our counter at{' '}
+              No active order matched <strong className="text-stone-900">{query}</strong>. Double-check your Bill Number or 10-digit mobile number, or call our counter at{' '}
               <a href={`tel:${shopDetails.whatsappDigits}`} className="font-semibold text-rose-800 hover:underline">
                 {shopDetails.phone}
               </a>
@@ -210,8 +207,6 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2 text-sm">
                         <span className="font-mono-tabular font-semibold text-stone-950">Bill #{order.orderNo}</span>
-                        <span aria-hidden="true" className="text-stone-400">·</span>
-                        <span className="font-medium text-stone-800">{order.customerName}</span>
                         <span aria-hidden="true" className="text-stone-400">·</span>
                         <span
                           className={`inline-flex items-center gap-1 font-semibold ${
@@ -248,7 +243,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
 
                     <div className="flex flex-wrap items-center gap-6 text-xs">
                       <div>
-                        <span className="text-stone-500 block">Pickup Date</span>
+                        <span className="text-stone-500 block">Delivery Date</span>
                         <span className="font-mono-tabular font-semibold text-stone-900">{order.deliveryDate}</span>
                       </div>
                       <div>
@@ -258,7 +253,7 @@ export function HeroSection({ shopDetails, reviewSummary }: HeroSectionProps) {
                         </span>
                       </div>
                       <a
-                        href={buildOrderInquiryWhatsAppUrl(shopDetails.whatsappDigits, order)}
+                        href={buildOrderInquiryWhatsAppUrl(shopDetails.whatsappDigits, { orderNo: order.orderNo })}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 border border-stone-300 hover:border-stone-400 rounded-lg font-semibold text-stone-800 hover:bg-stone-50 transition-colors whitespace-nowrap"

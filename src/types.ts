@@ -1,4 +1,4 @@
-export type OrderStatus = 'Booked' | 'In Progress' | 'Ready' | 'Delivered';
+export type OrderStatus = 'Booked' | 'In Progress' | 'Ready' | 'Partial Delivered' | 'Delivered';
 
 export interface OrderItem {
   id: string;
