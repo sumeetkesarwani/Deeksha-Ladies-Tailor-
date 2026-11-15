@@ -35,6 +35,9 @@ const FALLBACK_SHOP: ShopDetails = {
   announcement: 'Express 24-Hour Stitching Available for Urgent Occasions',
   googleBusinessUrl: 'https://share.google/zbgBH15WaKYkn3CG8',
   googleMapsUrl: 'https://maps.app.goo.gl/yMKhwcrZyKzaqVR4A?g_st=ac',
+  youtubeUrl: 'https://youtube.com/@deesufashiondesigner?si=NTjEtf-O3dJb6ocE',
+  instagramUrl: 'https://www.instagram.com/deesufashion?dlrf=aGRyaWttNWE0NnNy',
+  facebookUrl: 'https://www.facebook.com/deesuCollection',
   baseDirectoryRating: 4.8,
   baseDirectoryReviewCount: 35,
 };
@@ -132,7 +135,13 @@ export default function App() {
         if (!res.ok) return;
         const data = (await res.json()) as PublicBootstrapPayload;
         if (!cloudShopLoadedRef.current && data.shopDetails) {
-          setShopDetails(data.shopDetails);
+          setShopDetails({
+            ...FALLBACK_SHOP,
+            ...data.shopDetails,
+            youtubeUrl: data.shopDetails.youtubeUrl ?? FALLBACK_SHOP.youtubeUrl,
+            instagramUrl: data.shopDetails.instagramUrl ?? FALLBACK_SHOP.instagramUrl,
+            facebookUrl: data.shopDetails.facebookUrl ?? FALLBACK_SHOP.facebookUrl,
+          });
         }
         if (!cloudCatalogLoadedRef.current && data.catalog) {
           setCatalog(data.catalog);
@@ -172,7 +181,13 @@ export default function App() {
       },
       onShopDetailsUpdate: (cloudShop) => {
         cloudShopLoadedRef.current = true;
-        setShopDetails(cloudShop);
+        setShopDetails({
+          ...FALLBACK_SHOP,
+          ...cloudShop,
+          youtubeUrl: cloudShop.youtubeUrl ?? FALLBACK_SHOP.youtubeUrl,
+          instagramUrl: cloudShop.instagramUrl ?? FALLBACK_SHOP.instagramUrl,
+          facebookUrl: cloudShop.facebookUrl ?? FALLBACK_SHOP.facebookUrl,
+        });
       },
       onCatalogUpdate: (cloudCatalog) => {
         cloudCatalogLoadedRef.current = true;
@@ -359,6 +374,36 @@ export default function App() {
             >
               Google Business Profile
             </a>
+            {shopDetails.youtubeUrl && (
+              <a
+                href={shopDetails.youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white transition-colors"
+              >
+                YouTube
+              </a>
+            )}
+            {shopDetails.instagramUrl && (
+              <a
+                href={shopDetails.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white transition-colors"
+              >
+                Instagram
+              </a>
+            )}
+            {shopDetails.facebookUrl && (
+              <a
+                href={shopDetails.facebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white transition-colors"
+              >
+                Facebook
+              </a>
+            )}
           </div>
 
           <div className="md:text-right space-y-1">

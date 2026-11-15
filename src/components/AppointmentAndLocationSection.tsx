@@ -327,6 +327,58 @@ export function AppointmentAndLocationSection({ shopDetails }: AppointmentAndLoc
               <ArrowUpRight className="w-4 h-4" />
             </a>
           </div>
+
+          {(shopDetails.youtubeUrl || shopDetails.instagramUrl || shopDetails.facebookUrl) && (
+            <div className="pt-4 border-t border-stone-200 space-y-2.5">
+              <p className="text-xs font-semibold text-stone-700">Follow Our Designs &amp; Collections</p>
+              <div className="flex flex-wrap gap-2.5">
+                {shopDetails.youtubeUrl && (
+                  <a
+                    href={shopDetails.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-stone-300 hover:border-rose-300 hover:text-rose-800 text-stone-800 text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="w-4 h-4 fill-current text-rose-700">
+                      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.2 31.2 0 0 0 0 12a31.2 31.2 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.2 31.2 0 0 0 24 12a31.2 31.2 0 0 0-.5-5.8ZM9.6 15.6V8.4l6.3 3.6-6.3 3.6Z" />
+                    </svg>
+                    <span>YouTube</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                {shopDetails.instagramUrl && (
+                  <a
+                    href={shopDetails.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-stone-300 hover:border-rose-300 hover:text-rose-800 text-stone-800 text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="w-4 h-4 fill-none stroke-current text-rose-700" strokeWidth="2">
+                      <rect x="2" y="2" width="20" height="20" rx="5" />
+                      <circle cx="12" cy="12" r="4" />
+                      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                    </svg>
+                    <span>Instagram</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                {shopDetails.facebookUrl && (
+                  <a
+                    href={shopDetails.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-stone-300 hover:border-rose-300 hover:text-rose-800 text-stone-800 text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="w-4 h-4 fill-current text-sky-700">
+                      <path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.24.2 2.24.2v2.46H15.2c-1.24 0-1.63.77-1.63 1.56V12h2.77l-.44 2.89h-2.33v6.99A10 10 0 0 0 22 12Z" />
+                    </svg>
+                    <span>Facebook</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>

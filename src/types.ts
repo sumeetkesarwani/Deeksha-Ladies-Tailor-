@@ -69,6 +69,9 @@ export interface ShopDetails {
   announcement: string;
   googleBusinessUrl: string;
   googleMapsUrl: string;
+  youtubeUrl?: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
   baseDirectoryRating: number;
   baseDirectoryReviewCount: number;
 }

@@ -159,6 +159,9 @@ function createSeedStore(): PersistedStore {
       announcement: 'Express 24-Hour Stitching Available for Urgent Occasions',
       googleBusinessUrl: 'https://share.google/zbgBH15WaKYkn3CG8',
       googleMapsUrl: 'https://maps.app.goo.gl/yMKhwcrZyKzaqVR4A?g_st=ac',
+      youtubeUrl: 'https://youtube.com/@deesufashiondesigner?si=NTjEtf-O3dJb6ocE',
+      instagramUrl: 'https://www.instagram.com/deesufashion?dlrf=aGRyaWttNWE0NnNy',
+      facebookUrl: 'https://www.facebook.com/deesuCollection',
       baseDirectoryRating: 4.8,
       baseDirectoryReviewCount: 35,
     },
@@ -236,6 +239,11 @@ function loadStore(): PersistedStore {
   const parsed = JSON.parse(raw) as PersistedStore;
   if (!parsed.catalog) {
     parsed.catalog = DEFAULT_CATALOG;
+  }
+  if (parsed.shopDetails) {
+    parsed.shopDetails.youtubeUrl ??= 'https://youtube.com/@deesufashiondesigner?si=NTjEtf-O3dJb6ocE';
+    parsed.shopDetails.instagramUrl ??= 'https://www.instagram.com/deesufashion?dlrf=aGRyaWttNWE0NnNy';
+    parsed.shopDetails.facebookUrl ??= 'https://www.facebook.com/deesuCollection';
   }
   return parsed;
 }
@@ -669,6 +677,18 @@ async function startServer(): Promise<void> {
       announcement: String(body.announcement ?? prev.announcement).trim(),
       googleBusinessUrl: String(body.googleBusinessUrl ?? prev.googleBusinessUrl).trim() || prev.googleBusinessUrl,
       googleMapsUrl: String(body.googleMapsUrl ?? prev.googleMapsUrl).trim() || prev.googleMapsUrl,
+      youtubeUrl:
+        typeof body.youtubeUrl === 'string'
+          ? body.youtubeUrl.trim()
+          : (prev.youtubeUrl ?? 'https://youtube.com/@deesufashiondesigner?si=NTjEtf-O3dJb6ocE'),
+      instagramUrl:
+        typeof body.instagramUrl === 'string'
+          ? body.instagramUrl.trim()
+          : (prev.instagramUrl ?? 'https://www.instagram.com/deesufashion?dlrf=aGRyaWttNWE0NnNy'),
+      facebookUrl:
+        typeof body.facebookUrl === 'string'
+          ? body.facebookUrl.trim()
+          : (prev.facebookUrl ?? 'https://www.facebook.com/deesuCollection'),
       baseDirectoryRating:
         typeof body.baseDirectoryRating === 'number' && body.baseDirectoryRating >= 1 && body.baseDirectoryRating <= 5
           ? Number(body.baseDirectoryRating.toFixed(1))

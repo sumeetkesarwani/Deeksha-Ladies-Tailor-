@@ -317,7 +317,12 @@ export function BusinessDashboard({
           return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         });
       }
-      setShopForm(data.shopDetails);
+      setShopForm({
+        youtubeUrl: initialShopDetails.youtubeUrl ?? 'https://youtube.com/@deesufashiondesigner?si=NTjEtf-O3dJb6ocE',
+        instagramUrl: initialShopDetails.instagramUrl ?? 'https://www.instagram.com/deesufashion?dlrf=aGRyaWttNWE0NnNy',
+        facebookUrl: initialShopDetails.facebookUrl ?? 'https://www.facebook.com/deesuCollection',
+        ...data.shopDetails,
+      });
       setCatalog(data.catalog);
       const drafts: Record<string, string> = {};
       data.reviews.forEach((r) => {
@@ -356,7 +361,12 @@ export function BusinessDashboard({
         });
       },
       onShopDetailsUpdate: (cloudShop) => {
-        setShopForm(cloudShop);
+        setShopForm({
+          youtubeUrl: initialShopDetails.youtubeUrl ?? 'https://youtube.com/@deesufashiondesigner?si=NTjEtf-O3dJb6ocE',
+          instagramUrl: initialShopDetails.instagramUrl ?? 'https://www.instagram.com/deesufashion?dlrf=aGRyaWttNWE0NnNy',
+          facebookUrl: initialShopDetails.facebookUrl ?? 'https://www.facebook.com/deesuCollection',
+          ...cloudShop,
+        });
       },
       onCatalogUpdate: (cloudCatalog) => {
         setCatalog(cloudCatalog);
@@ -1066,6 +1076,48 @@ export function BusinessDashboard({
                         type="url"
                         value={shopForm.googleMapsUrl}
                         onChange={(e) => setShopForm({ ...shopForm, googleMapsUrl: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label htmlFor="shop-youtube-url" className="block text-xs font-semibold text-stone-700 mb-1">
+                        YouTube URL
+                      </label>
+                      <input
+                        id="shop-youtube-url"
+                        type="url"
+                        value={shopForm.youtubeUrl ?? ''}
+                        onChange={(e) => setShopForm({ ...shopForm, youtubeUrl: e.target.value })}
+                        placeholder="https://youtube.com/..."
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="shop-instagram-url" className="block text-xs font-semibold text-stone-700 mb-1">
+                        Instagram URL
+                      </label>
+                      <input
+                        id="shop-instagram-url"
+                        type="url"
+                        value={shopForm.instagramUrl ?? ''}
+                        onChange={(e) => setShopForm({ ...shopForm, instagramUrl: e.target.value })}
+                        placeholder="https://www.instagram.com/..."
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="shop-facebook-url" className="block text-xs font-semibold text-stone-700 mb-1">
+                        Facebook URL
+                      </label>
+                      <input
+                        id="shop-facebook-url"
+                        type="url"
+                        value={shopForm.facebookUrl ?? ''}
+                        onChange={(e) => setShopForm({ ...shopForm, facebookUrl: e.target.value })}
+                        placeholder="https://www.facebook.com/..."
                         className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
                       />
                     </div>
