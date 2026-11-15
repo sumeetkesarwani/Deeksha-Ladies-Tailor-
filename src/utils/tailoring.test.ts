@@ -25,6 +25,21 @@ test('calculateStitchingEstimate computes base, turnaround, and addons accuratel
   assert.ok(res.whatsappUrl.includes('680'));
 });
 
+test('calculateStitchingEstimate uses custom owner-configured catalog prices', () => {
+  const res = calculateStitchingEstimate({
+    garmentId: 'custom-blouse',
+    turnaroundId: 'urgent',
+    addonIds: ['lace'],
+    catalog: {
+      estimatorGarments: [{ id: 'custom-blouse', name: 'Silk Designer Blouse', basePrice: 500, category: 'Blouse' }],
+      estimatorTurnarounds: [{ id: 'urgent', name: 'Same Day', fee: 200, windowLabel: 'Today' }],
+      estimatorAddons: [{ id: 'lace', label: 'Zari Lace', shortLabel: 'Zari Lace', price: 90 }],
+    },
+  });
+  assert.equal(res.total, 790);
+  assert.equal(res.garmentName, 'Silk Designer Blouse');
+});
+
 test('computeOrderBalance clamps non-negative balance', () => {
   assert.equal(computeOrderBalance(1200, 500), 700);
   assert.equal(computeOrderBalance(500, 700), 0);

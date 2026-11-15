@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LogOut,
   Plus,
+  Scissors,
   Search,
   Settings,
   Star,
@@ -12,6 +13,7 @@ import {
 import type {
   AppointmentStatus,
   AuthUser,
+  CatalogConfig,
   CustomerReview,
   FittingAppointment,
   OrderStatus,
@@ -20,28 +22,32 @@ import type {
   TailoringOrder,
 } from '../types.ts';
 import { filterOrders, formatCurrencyINR } from '../utils/tailoring.ts';
+import { CatalogEditorTab } from './CatalogEditorTab.tsx';
 
 interface BusinessDashboardProps {
   authUser: AuthUser;
   authToken: string;
   onLogout: () => void;
   onShopUpdated: (shopDetails: ShopDetails) => void;
+  onCatalogUpdated: (catalog: CatalogConfig) => void;
   onReviewsUpdated: (reviews: CustomerReview[], summary: ReviewSummary) => void;
   onCredentialsUpdated: (user: AuthUser, token: string) => void;
 }
 
-type AdminTab = 'orders' | 'appointments' | 'reviews' | 'settings';
+type AdminTab = 'orders' | 'appointments' | 'catalog' | 'reviews' | 'settings';
 
 export function BusinessDashboard({
   authUser,
   authToken,
   onLogout,
   onShopUpdated,
+  onCatalogUpdated,
   onReviewsUpdated,
   onCredentialsUpdated,
 }: BusinessDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('orders');
   const [loading, setLoading] = useState(true);
+  const [savingCatalog, setSavingCatalog] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -49,6 +55,7 @@ export function BusinessDashboard({
   const [appointments, setAppointments] = useState<FittingAppointment[]>([]);
   const [reviews, setReviews] = useState<CustomerReview[]>([]);
   const [shopForm, setShopForm] = useState<ShopDetails | null>(null);
+  const [catalog, setCatalog] = useState<CatalogConfig | null>(null);
 
   // Order filter & creation
   const [orderQuery, setOrderQuery] = useState('');
@@ -97,6 +104,7 @@ export function BusinessDashboard({
         appointments: FittingAppointment[];
         reviews: CustomerReview[];
         shopDetails: ShopDetails;
+        catalog: CatalogConfig;
         reviewSummary: ReviewSummary;
         error?: string;
       };
@@ -108,6 +116,7 @@ export function BusinessDashboard({
       setAppointments(data.appointments);
       setReviews(data.reviews);
       setShopForm(data.shopDetails);
+      setCatalog(data.catalog);
       const drafts: Record<string, string> = {};
       data.reviews.forEach((r) => {
         drafts[r.id] = r.ownerReply ?? '';
@@ -318,9 +327,33 @@ export function BusinessDashboard({
       setShopForm(data.shopDetails);
       onShopUpdated(data.shopDetails);
       await syncPublicReviews();
-      flashNotice('Shop details & Google Business link updated.');
+      flashNotice('Shop details & Google links updated.');
     } catch {
       setError('Network error saving shop details.');
+    }
+  };
+
+  const handleSaveCatalog = async (nextCatalog: CatalogConfig) => {
+    setError('');
+    setSavingCatalog(true);
+    try {
+      const res = await fetch('/api/admin/catalog', {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify(nextCatalog),
+      });
+      const data = (await res.json()) as { catalog?: CatalogConfig; error?: string };
+      if (!res.ok || !data.catalog) {
+        setError(data.error || 'Could not update services & pricing.');
+        return;
+      }
+      setCatalog(data.catalog);
+      onCatalogUpdated(data.catalog);
+      flashNotice('All services, estimator prices, and rates updated live.');
+    } catch {
+      setError('Network error saving pricing and services.');
+    } finally {
+      setSavingCatalog(false);
     }
   };
 
@@ -392,6 +425,19 @@ export function BusinessDashboard({
 
             <button
               type="button"
+              onClick={() => setActiveTab('catalog')}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'catalog'
+                  ? 'bg-stone-900 text-white'
+                  : 'text-stone-700 hover:bg-stone-100'
+              }`}
+            >
+              <Scissors className="w-4 h-4 shrink-0" />
+              <span>Services &amp; Pricing</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('reviews')}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'reviews'
@@ -432,12 +478,15 @@ export function BusinessDashboard({
       <main className="flex-1 p-4 sm:p-8 max-w-[1160px] space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-4">
           <div>
-            <p className="text-xs text-stone-500">Owner Portal / {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</p>
+            <p className="text-xs text-stone-500">
+              Owner Portal / {activeTab === 'catalog' ? 'Services & Pricing' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            </p>
             <h1 className="font-display text-2xl sm:text-3xl font-semibold text-stone-950">
               {activeTab === 'orders' && 'Tailoring Orders & Billing'}
               {activeTab === 'appointments' && 'Customer Fitting Appointments'}
+              {activeTab === 'catalog' && 'Services, Prices & Cost Estimator'}
               {activeTab === 'reviews' && 'Customer Reviews & Google Profile'}
-              {activeTab === 'settings' && 'Shop Details & Login Security'}
+              {activeTab === 'settings' && 'Shop Details, Map Links & Login'}
             </h1>
           </div>
 
@@ -813,6 +862,15 @@ export function BusinessDashboard({
               </div>
             )}
 
+            {/* CATALOG & PRICING TAB */}
+            {activeTab === 'catalog' && catalog && (
+              <CatalogEditorTab
+                catalog={catalog}
+                saving={savingCatalog}
+                onSaveCatalog={handleSaveCatalog}
+              />
+            )}
+
             {/* REVIEWS TAB */}
             {activeTab === 'reviews' && (
               <div className="space-y-4">
@@ -878,7 +936,7 @@ export function BusinessDashboard({
                   className="lg:col-span-7 bg-white rounded-2xl border border-stone-200 p-6 space-y-4"
                 >
                   <h2 className="text-base font-semibold text-stone-950 border-b border-stone-200 pb-3">
-                    Shop Details &amp; Google Business Link
+                    Shop Details &amp; Google Links
                   </h2>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -909,6 +967,19 @@ export function BusinessDashboard({
                   </div>
 
                   <div>
+                    <label htmlFor="shop-tagline" className="block text-xs font-semibold text-stone-700 mb-1">
+                      Tagline
+                    </label>
+                    <input
+                      id="shop-tagline"
+                      type="text"
+                      value={shopForm.tagline}
+                      onChange={(e) => setShopForm({ ...shopForm, tagline: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
+                    />
+                  </div>
+
+                  <div>
                     <label htmlFor="shop-address" className="block text-xs font-semibold text-stone-700 mb-1">
                       Street Address
                     </label>
@@ -921,7 +992,46 @@ export function BusinessDashboard({
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label htmlFor="shop-landmark" className="block text-xs font-semibold text-stone-700 mb-1">
+                        Landmark
+                      </label>
+                      <input
+                        id="shop-landmark"
+                        type="text"
+                        value={shopForm.landmark}
+                        onChange={(e) => setShopForm({ ...shopForm, landmark: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="shop-city" className="block text-xs font-semibold text-stone-700 mb-1">
+                        City / Locality
+                      </label>
+                      <input
+                        id="shop-city"
+                        type="text"
+                        value={shopForm.city}
+                        onChange={(e) => setShopForm({ ...shopForm, city: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="shop-pincode" className="block text-xs font-semibold text-stone-700 mb-1">
+                        Pincode
+                      </label>
+                      <input
+                        id="shop-pincode"
+                        type="text"
+                        value={shopForm.pincode}
+                        onChange={(e) => setShopForm({ ...shopForm, pincode: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label htmlFor="shop-hours" className="block text-xs font-semibold text-stone-700 mb-1">
                         Shop Hours
@@ -935,6 +1045,38 @@ export function BusinessDashboard({
                       />
                     </div>
                     <div>
+                      <label htmlFor="shop-wa" className="block text-xs font-semibold text-stone-700 mb-1">
+                        WhatsApp Digits (with 91)
+                      </label>
+                      <input
+                        id="shop-wa"
+                        type="text"
+                        value={shopForm.whatsappDigits}
+                        onChange={(e) => setShopForm({ ...shopForm, whatsappDigits: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="shop-rating" className="block text-xs font-semibold text-stone-700 mb-1">
+                        Base Rating (1.0 – 5.0)
+                      </label>
+                      <input
+                        id="shop-rating"
+                        type="number"
+                        step="0.1"
+                        min={1}
+                        max={5}
+                        value={shopForm.baseDirectoryRating}
+                        onChange={(e) =>
+                          setShopForm({ ...shopForm, baseDirectoryRating: Number(e.target.value) || 4.8 })
+                        }
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono-tabular outline-none focus:border-rose-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
                       <label htmlFor="shop-google-url" className="block text-xs font-semibold text-stone-700 mb-1">
                         Google Business Share Link
                       </label>
@@ -943,6 +1085,18 @@ export function BusinessDashboard({
                         type="url"
                         value={shopForm.googleBusinessUrl}
                         onChange={(e) => setShopForm({ ...shopForm, googleBusinessUrl: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="shop-maps-url" className="block text-xs font-semibold text-stone-700 mb-1">
+                        Google Maps Link
+                      </label>
+                      <input
+                        id="shop-maps-url"
+                        type="url"
+                        value={shopForm.googleMapsUrl}
+                        onChange={(e) => setShopForm({ ...shopForm, googleMapsUrl: e.target.value })}
                         className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm outline-none focus:border-rose-800"
                       />
                     </div>

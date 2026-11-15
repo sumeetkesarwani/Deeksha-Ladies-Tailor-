@@ -73,6 +73,57 @@ export interface ShopDetails {
   baseDirectoryReviewCount: number;
 }
 
+export interface GarmentOption {
+  id: string;
+  name: string;
+  basePrice: number;
+  category: 'Blouse' | 'Suit & Kurti' | 'Bridal & Gown';
+}
+
+export interface TurnaroundOption {
+  id: string;
+  name: string;
+  fee: number;
+  windowLabel: string;
+}
+
+export interface AddonOption {
+  id: string;
+  label: string;
+  shortLabel: string;
+  price: number;
+}
+
+export interface ServiceOffering {
+  number: string;
+  title: string;
+  description: string;
+  startingPrice: number;
+  highlights: string[];
+}
+
+export interface MatchingRateItem {
+  name: string;
+  spec: string;
+  rateRange: string;
+  unit: string;
+}
+
+export interface DesignPattern {
+  name: string;
+  category: string;
+  note: string;
+}
+
+export interface CatalogConfig {
+  services: ServiceOffering[];
+  designPatterns: DesignPattern[];
+  matchingRates: MatchingRateItem[];
+  estimatorGarments: GarmentOption[];
+  estimatorTurnarounds: TurnaroundOption[];
+  estimatorAddons: AddonOption[];
+}
+
 export interface AuthUser {
   businessId: string;
   ownerName: string;
@@ -80,6 +131,7 @@ export interface AuthUser {
 
 export interface PublicBootstrapPayload {
   shopDetails: ShopDetails;
+  catalog: CatalogConfig;
   reviews: CustomerReview[];
   reviewSummary: ReviewSummary;
 }

@@ -1,31 +1,43 @@
 import { useMemo, useState } from 'react';
-import {
-  ADDON_OPTIONS,
-  GARMENT_OPTIONS,
-  TURNAROUND_OPTIONS,
-  calculateStitchingEstimate,
-  formatCurrencyINR,
-} from '../utils/tailoring.ts';
-import type { ShopDetails } from '../types.ts';
+import { calculateStitchingEstimate, formatCurrencyINR } from '../utils/tailoring.ts';
+import type { AddonOption, GarmentOption, ShopDetails, TurnaroundOption } from '../types.ts';
 
 interface CostEstimatorSectionProps {
   shopDetails: ShopDetails;
+  garments: GarmentOption[];
+  turnarounds: TurnaroundOption[];
+  addons: AddonOption[];
 }
 
-export function CostEstimatorSection({ shopDetails }: CostEstimatorSectionProps) {
-  const [garmentId, setGarmentId] = useState<string>(GARMENT_OPTIONS[0].id);
-  const [turnaroundId, setTurnaroundId] = useState<string>(TURNAROUND_OPTIONS[0].id);
+export function CostEstimatorSection({
+  shopDetails,
+  garments,
+  turnarounds,
+  addons,
+}: CostEstimatorSectionProps) {
+  const [garmentId, setGarmentId] = useState<string>(garments[0]?.id ?? '');
+  const [turnaroundId, setTurnaroundId] = useState<string>(turnarounds[0]?.id ?? '');
   const [addonIds, setAddonIds] = useState<string[]>([]);
+
+  const effectiveGarmentId = garments.some((g) => g.id === garmentId) ? garmentId : (garments[0]?.id ?? '');
+  const effectiveTurnaroundId = turnarounds.some((t) => t.id === turnaroundId)
+    ? turnaroundId
+    : (turnarounds[0]?.id ?? '');
 
   const estimate = useMemo(
     () =>
       calculateStitchingEstimate({
-        garmentId,
-        turnaroundId,
+        garmentId: effectiveGarmentId,
+        turnaroundId: effectiveTurnaroundId,
         addonIds,
         whatsappDigits: shopDetails.whatsappDigits,
+        catalog: {
+          estimatorGarments: garments,
+          estimatorTurnarounds: turnarounds,
+          estimatorAddons: addons,
+        },
       }),
-    [garmentId, turnaroundId, addonIds, shopDetails.whatsappDigits],
+    [effectiveGarmentId, effectiveTurnaroundId, addonIds, shopDetails.whatsappDigits, garments, turnarounds, addons],
   );
 
   const toggleAddon = (id: string) => {
@@ -53,11 +65,11 @@ export function CostEstimatorSection({ shopDetails }: CostEstimatorSectionProps)
               </label>
               <select
                 id="est-garment"
-                value={garmentId}
+                value={effectiveGarmentId}
                 onChange={(e) => setGarmentId(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 focus:border-rose-800 rounded-lg text-sm font-medium text-stone-900 outline-none"
               >
-                {GARMENT_OPTIONS.map((g) => (
+                {garments.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name} — {formatCurrencyINR(g.basePrice)}
                   </option>
@@ -71,11 +83,11 @@ export function CostEstimatorSection({ shopDetails }: CostEstimatorSectionProps)
               </label>
               <select
                 id="est-speed"
-                value={turnaroundId}
+                value={effectiveTurnaroundId}
                 onChange={(e) => setTurnaroundId(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-white border border-stone-300 focus:border-rose-800 rounded-lg text-sm font-medium text-stone-900 outline-none"
               >
-                {TURNAROUND_OPTIONS.map((t) => (
+                {turnarounds.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} {t.fee > 0 ? `(+${formatCurrencyINR(t.fee)})` : '· Regular'}
                   </option>
@@ -87,7 +99,7 @@ export function CostEstimatorSection({ shopDetails }: CostEstimatorSectionProps)
           <div className="space-y-2.5 pt-4 border-t border-stone-200">
             <span className="block text-xs font-semibold text-stone-700">3. Design Add-Ons &amp; Linings</span>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-              {ADDON_OPTIONS.map((addon) => {
+              {addons.map((addon) => {
                 const checked = addonIds.includes(addon.id);
                 return (
                   <label

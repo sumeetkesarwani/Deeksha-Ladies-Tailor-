@@ -1,0 +1,287 @@
+{
+  "owner": {
+    "businessId": "deeksha_owner",
+    "ownerName": "Deeksha Boutique Owner",
+    "passwordSalt": "10690dda78285250eda099c0580f660a",
+    "passwordHash": "78d2054311d7f9130decd372ffd9f5f4caec7df7a49607afdddfe9978076f019aadafe14af485f08508f7a2238e6eb614debe17a6fe2266fd0f9df85d9aac62b"
+  },
+  "shopDetails": {
+    "businessName": "Deeksha Ladies Tailor & Matching Center",
+    "tagline": "Designer Blouses, Salwar Suits, Bridal Lehengas & Matching Fabrics",
+    "address": "211 Road, Opposite Bazaar Kolkata, Near Rajarhat Thana",
+    "landmark": "Opposite Bazaar Kolkata",
+    "city": "Rajarhat, Kolkata",
+    "pincode": "700135",
+    "phone": "+91 74495 31663",
+    "whatsappDigits": "917449531663",
+    "hours": "Mon – Sun: 10:30 AM – 9:00 PM",
+    "announcement": "Express 24-Hour Stitching Available for Urgent Occasions",
+    "googleBusinessUrl": "https://share.google/zbgBH15WaKYkn3CG8",
+    "googleMapsUrl": "https://maps.app.goo.gl/yMKhwcrZyKzaqVR4A?g_st=ac",
+    "baseDirectoryRating": 4.8,
+    "baseDirectoryReviewCount": 35
+  },
+  "catalog": {
+    "services": [
+      {
+        "number": "01",
+        "title": "Designer Blouses",
+        "description": "Signature Alite cut, Prince cut (padded and non-padded), double Katori, Bombay cut, Sabyasachi bridal cuts, and backless dori styling.",
+        "startingPrice": 350,
+        "highlights": [
+          "16-point bust & shoulder darting",
+          "Zero-puckering back necklines"
+        ]
+      },
+      {
+        "number": "02",
+        "title": "Salwar Suits & Kurtis",
+        "description": "Straight cut, Nayra cut, Alia cut V-Empire, flared Anarkalis, Pakistani suits with designer mori, cigarette pants, and palazzos.",
+        "startingPrice": 350,
+        "highlights": [
+          "Custom neckline & sleeve finish",
+          "Breathable cotton or crepe lining"
+        ]
+      },
+      {
+        "number": "03",
+        "title": "Bridal & Lehenga Cholis",
+        "description": "Heavy zari bridal lehenga choli tailoring, kalidar stitching, cancan net insertion, dupatta setting, and festive western gowns.",
+        "startingPrice": 1200,
+        "highlights": [
+          "Structured cancan volume",
+          "Precision zardozi seam handling"
+        ]
+      },
+      {
+        "number": "04",
+        "title": "Saree Fall, Pico & Alterations",
+        "description": "Fine saree fall stitching, zig-zag interlock pico, saree kuchu thread tassels, handmade bridal latkans, and precision alterations.",
+        "startingPrice": 60,
+        "highlights": [
+          "Pre-washed colorfast falls",
+          "Same-day urgent alterations"
+        ]
+      }
+    ],
+    "designPatterns": [
+      {
+        "name": "Alite Cut",
+        "category": "Blouse Cut",
+        "note": "Structured bust darting & tailored everyday poise"
+      },
+      {
+        "name": "Prince Cut",
+        "category": "Blouse Cut",
+        "note": "Seamless princess curve with optional padded support"
+      },
+      {
+        "name": "Sweetheart Neck",
+        "category": "Neckline",
+        "note": "Deep romantic neckline with crisp piping finish"
+      },
+      {
+        "name": "Sabyasachi Cut",
+        "category": "Bridal Cut",
+        "note": "Broad deep V-neck paired with heavy bridal dori"
+      },
+      {
+        "name": "Pot / Keyhole Back",
+        "category": "Back Pattern",
+        "note": "Balanced drop cutout finished with custom latkans"
+      },
+      {
+        "name": "Alia Empire Kurti",
+        "category": "Ethnic Kurti",
+        "note": "V-empire gathers tailored for festive occasions"
+      }
+    ],
+    "matchingRates": [
+      {
+        "name": "Premium Rubia Cotton Astar",
+        "spec": "100% pre-shrunk colorfast cotton across 100+ shades",
+        "rateRange": "₹45 – ₹65",
+        "unit": "per meter"
+      },
+      {
+        "name": "Santoon / Butter Crepe Lining",
+        "spec": "Soft silky drape for designer suits, anarkalis & kurtis",
+        "rateRange": "₹60 – ₹80",
+        "unit": "per meter"
+      },
+      {
+        "name": "Standard Cotton Saree Fall",
+        "spec": "Pre-washed, anti-shrink border weight in matching shades",
+        "rateRange": "₹30 – ₹45",
+        "unit": "per piece"
+      },
+      {
+        "name": "Fancy Heavy Bridal Latkan",
+        "spec": "Handmade thread tassels, mirror work & pearl drops",
+        "rateRange": "₹80 – ₹250",
+        "unit": "per pair"
+      },
+      {
+        "name": "Gota Patti & Cutwork Border",
+        "spec": "Gold, silver, zari, and thread decorative laces",
+        "rateRange": "₹35 – ₹120",
+        "unit": "per meter"
+      },
+      {
+        "name": "Pure Cotton Inskirt / Petticoat",
+        "spec": "Standard cotton petticoats, satin inskirts & mermaid cuts",
+        "rateRange": "₹160 – ₹240",
+        "unit": "per piece"
+      }
+    ],
+    "estimatorGarments": [
+      {
+        "id": "alite-blouse",
+        "name": "Alite Cut Designer Blouse",
+        "basePrice": 350,
+        "category": "Blouse"
+      },
+      {
+        "id": "prince-blouse",
+        "name": "Prince Cut Blouse",
+        "basePrice": 320,
+        "category": "Blouse"
+      },
+      {
+        "id": "katori-blouse",
+        "name": "Katori / Double Katori Blouse",
+        "basePrice": 420,
+        "category": "Blouse"
+      },
+      {
+        "id": "sabyasachi-blouse",
+        "name": "Sabyasachi / Bridal Cut Blouse",
+        "basePrice": 450,
+        "category": "Blouse"
+      },
+      {
+        "id": "straight-kurti",
+        "name": "Simple Straight Kurti / Top",
+        "basePrice": 350,
+        "category": "Suit & Kurti"
+      },
+      {
+        "id": "salwar-suit",
+        "name": "Full Salwar Suit Set (Top + Bottom)",
+        "basePrice": 550,
+        "category": "Suit & Kurti"
+      },
+      {
+        "id": "anarkali-suit",
+        "name": "Anarkali / Alia / Nayra Cut Suit",
+        "basePrice": 750,
+        "category": "Suit & Kurti"
+      },
+      {
+        "id": "lehenga-choli",
+        "name": "Lehenga Choli Stitching",
+        "basePrice": 1200,
+        "category": "Bridal & Gown"
+      }
+    ],
+    "estimatorTurnarounds": [
+      {
+        "id": "standard",
+        "name": "Standard Delivery (4–6 Days)",
+        "fee": 0,
+        "windowLabel": "4 to 6 Days"
+      },
+      {
+        "id": "express",
+        "name": "Express Rush Delivery (24–48 Hours)",
+        "fee": 150,
+        "windowLabel": "24 to 48 Hours"
+      }
+    ],
+    "estimatorAddons": [
+      {
+        "id": "cups",
+        "label": "Padded Cups",
+        "shortLabel": "Padded Cups",
+        "price": 120
+      },
+      {
+        "id": "lining",
+        "label": "Double / Cotton Lining",
+        "shortLabel": "Double Lining",
+        "price": 80
+      },
+      {
+        "id": "piping",
+        "label": "Contrast Thread Piping",
+        "shortLabel": "Piping",
+        "price": 60
+      },
+      {
+        "id": "dori",
+        "label": "Dori + Latkan Set",
+        "shortLabel": "Dori Latkan",
+        "price": 80
+      },
+      {
+        "id": "fall",
+        "label": "Saree Fall + Pico",
+        "shortLabel": "Fall Pico",
+        "price": 60
+      }
+    ]
+  },
+  "orders": [],
+  "appointments": [],
+  "reviews": [
+    {
+      "id": "rev-1",
+      "customerName": "Srabani Roy",
+      "rating": 5,
+      "service": "Designer Blouse & Matching Astar",
+      "comment": "Accurate shoulder and bust fitting without needing repeated alterations. Having matching cotton astar and falls right at the shop saves so much time in Rajarhat.",
+      "source": "Google Business Profile",
+      "visitDate": "October 2026",
+      "visible": true,
+      "featured": true,
+      "ownerReply": "Thank you for trusting us with your festive sarees, Srabani ji.",
+      "createdAt": "2026-10-24T12:00:00.000Z"
+    },
+    {
+      "id": "rev-2",
+      "customerName": "Paramita Bose",
+      "rating": 5,
+      "service": "Bridal Blouse & Saree Finishing",
+      "comment": "Cooperative staff and reliable delivery dates even during Durga Puja rush. My padded Prince cut blouses turned out neat with zero puckering.",
+      "source": "Justdial Verified",
+      "visitDate": "October 2026",
+      "visible": true,
+      "featured": true,
+      "createdAt": "2026-10-12T15:30:00.000Z"
+    },
+    {
+      "id": "rev-3",
+      "customerName": "Nandini Chakraborty",
+      "rating": 5,
+      "service": "Salwar Suit & Alia Cut Kurti",
+      "comment": "Very convenient location right opposite Bazaar Kolkata near Rajarhat Thana. Clean finishing on Pakistani suit mori and palazzo trousers.",
+      "source": "Google Business Profile",
+      "visitDate": "September 2026",
+      "visible": true,
+      "featured": false,
+      "createdAt": "2026-09-28T11:20:00.000Z"
+    },
+    {
+      "id": "rev-4",
+      "customerName": "Tania Mondal",
+      "rating": 4,
+      "service": "Urgent 24-Hour Blouse Stitching",
+      "comment": "Needed an urgent blouse stitched before a wedding in New Town. Delivered on time with matching dori and handmade tassels.",
+      "source": "Justdial Verified",
+      "visitDate": "September 2026",
+      "visible": true,
+      "featured": false,
+      "createdAt": "2026-09-14T18:10:00.000Z"
+    }
+  ]
+}

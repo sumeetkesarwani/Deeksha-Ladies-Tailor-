@@ -1,8 +1,14 @@
 import { useState } from 'react';
-import { DESIGN_PATTERNS, SERVICE_OFFERINGS, formatCurrencyINR } from '../utils/tailoring.ts';
+import type { DesignPattern, ServiceOffering } from '../types.ts';
+import { formatCurrencyINR } from '../utils/tailoring.ts';
 import designerBlouseImg from '../assets/images/designer_blouse_craft_1794727219299.jpg';
 
-export function ServicesAndCatalog() {
+interface ServicesAndCatalogProps {
+  services: ServiceOffering[];
+  designPatterns: DesignPattern[];
+}
+
+export function ServicesAndCatalog({ services, designPatterns }: ServicesAndCatalogProps) {
   const [imageError, setImageError] = useState(false);
 
   return (
@@ -38,17 +44,19 @@ export function ServicesAndCatalog() {
           </div>
 
           <div className="lg:col-span-7 divide-y divide-stone-200 border-y border-stone-200">
-            {SERVICE_OFFERINGS.map((service) => (
-              <div key={service.number} className="py-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            {services.map((service, idx) => (
+              <div key={`${service.number}-${idx}`} className="py-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="space-y-2 max-w-xl">
                   <div className="flex items-baseline gap-3">
                     <span className="font-mono-tabular text-xs font-semibold text-rose-800">{service.number}.</span>
                     <h3 className="text-lg font-semibold text-stone-950">{service.title}</h3>
                   </div>
                   <p className="text-sm text-stone-600 leading-relaxed">{service.description}</p>
-                  <p className="text-xs text-stone-500">
-                    {service.highlights.join(' · ')}
-                  </p>
+                  {service.highlights.length > 0 && (
+                    <p className="text-xs text-stone-500">
+                      {service.highlights.join(' · ')}
+                    </p>
+                  )}
                 </div>
                 <div className="sm:text-right shrink-0">
                   <span className="text-xs text-stone-500 block">Starting from</span>
@@ -76,8 +84,8 @@ export function ServicesAndCatalog() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {DESIGN_PATTERNS.map((pattern) => (
-              <div key={pattern.name} className="p-5 rounded-xl border border-stone-200 bg-[#FAF8F6] space-y-1.5">
+            {designPatterns.map((pattern, idx) => (
+              <div key={`${pattern.name}-${idx}`} className="p-5 rounded-xl border border-stone-200 bg-[#FAF8F6] space-y-1.5">
                 <p className="text-xs text-stone-500">{pattern.category}</p>
                 <h4 className="text-base font-semibold text-stone-950">{pattern.name}</h4>
                 <p className="text-sm text-stone-600 leading-relaxed">{pattern.note}</p>

@@ -6,6 +6,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import type {
   AppointmentStatus,
+  CatalogConfig,
   CustomerReview,
   FittingAppointment,
   OrderStatus,
@@ -13,6 +14,7 @@ import type {
   TailoringOrder,
 } from './src/types.ts';
 import {
+  DEFAULT_CATALOG,
   computeOrderBalance,
   computeReviewSummary,
   filterOrders,
@@ -31,6 +33,7 @@ interface OwnerAccount {
 interface PersistedStore {
   owner: OwnerAccount;
   shopDetails: ShopDetails;
+  catalog: CatalogConfig;
   orders: TailoringOrder[];
   appointments: FittingAppointment[];
   reviews: CustomerReview[];
@@ -105,10 +108,11 @@ function createSeedStore(): PersistedStore {
       hours: 'Mon – Sun: 10:30 AM – 9:00 PM',
       announcement: 'Express 24-Hour Stitching Available for Urgent Occasions',
       googleBusinessUrl: 'https://share.google/zbgBH15WaKYkn3CG8',
-      googleMapsUrl: 'https://maps.google.com/?q=211+Road,+Opposite+Bazaar+Kolkata,+Rajarhat,+Kolkata+700135',
+      googleMapsUrl: 'https://maps.app.goo.gl/yMKhwcrZyKzaqVR4A?g_st=ac',
       baseDirectoryRating: 4.8,
       baseDirectoryReviewCount: 35,
     },
+    catalog: DEFAULT_CATALOG,
     orders: [],
     appointments: [],
     reviews: [
@@ -179,7 +183,11 @@ function loadStore(): PersistedStore {
     return seeded;
   }
   const raw = fs.readFileSync(STORE_PATH, 'utf8');
-  return JSON.parse(raw) as PersistedStore;
+  const parsed = JSON.parse(raw) as PersistedStore;
+  if (!parsed.catalog) {
+    parsed.catalog = DEFAULT_CATALOG;
+  }
+  return parsed;
 }
 
 function saveStore(store: PersistedStore): void {
@@ -238,6 +246,7 @@ async function startServer(): Promise<void> {
     );
     res.json({
       shopDetails: store.shopDetails,
+      catalog: store.catalog,
       reviews: visibleReviews,
       reviewSummary,
     });
@@ -469,6 +478,7 @@ async function startServer(): Promise<void> {
       appointments: store.appointments,
       reviews: store.reviews,
       shopDetails: store.shopDetails,
+      catalog: store.catalog,
       reviewSummary,
     });
   });
@@ -652,6 +662,98 @@ async function startServer(): Promise<void> {
     };
     saveStore(store);
     res.json({ shopDetails: store.shopDetails });
+  });
+
+  app.put('/api/admin/catalog', requireOwnerAuth, (req, res) => {
+    const body = req.body as Partial<CatalogConfig>;
+    const store = loadStore();
+    const prev = store.catalog;
+
+    const services = Array.isArray(body.services)
+      ? body.services
+          .map((s, idx) => ({
+            number: String(s.number ?? String(idx + 1).padStart(2, '0')).trim() || String(idx + 1).padStart(2, '0'),
+            title: String(s.title ?? '').trim(),
+            description: String(s.description ?? '').trim(),
+            startingPrice: Math.max(0, Number(s.startingPrice) || 0),
+            highlights: Array.isArray(s.highlights)
+              ? s.highlights.map((h) => String(h).trim()).filter(Boolean)
+              : [],
+          }))
+          .filter((s) => s.title.length > 0)
+      : prev.services;
+
+    const designPatterns = Array.isArray(body.designPatterns)
+      ? body.designPatterns
+          .map((p) => ({
+            name: String(p.name ?? '').trim(),
+            category: String(p.category ?? 'Pattern').trim() || 'Pattern',
+            note: String(p.note ?? '').trim(),
+          }))
+          .filter((p) => p.name.length > 0)
+      : prev.designPatterns;
+
+    const matchingRates = Array.isArray(body.matchingRates)
+      ? body.matchingRates
+          .map((m) => ({
+            name: String(m.name ?? '').trim(),
+            spec: String(m.spec ?? '').trim(),
+            rateRange: String(m.rateRange ?? '').trim(),
+            unit: String(m.unit ?? '').trim(),
+          }))
+          .filter((m) => m.name.length > 0)
+      : prev.matchingRates;
+
+    const estimatorGarments = Array.isArray(body.estimatorGarments)
+      ? body.estimatorGarments
+          .map((g, idx) => ({
+            id: String(g.id ?? `garment-${Date.now()}-${idx}`).trim() || `garment-${Date.now()}-${idx}`,
+            name: String(g.name ?? '').trim(),
+            basePrice: Math.max(0, Number(g.basePrice) || 0),
+            category: (g.category === 'Blouse' || g.category === 'Suit & Kurti' || g.category === 'Bridal & Gown'
+              ? g.category
+              : 'Blouse') as 'Blouse' | 'Suit & Kurti' | 'Bridal & Gown',
+          }))
+          .filter((g) => g.name.length > 0)
+      : prev.estimatorGarments;
+
+    const estimatorTurnarounds = Array.isArray(body.estimatorTurnarounds)
+      ? body.estimatorTurnarounds
+          .map((t, idx) => ({
+            id: String(t.id ?? `speed-${Date.now()}-${idx}`).trim() || `speed-${Date.now()}-${idx}`,
+            name: String(t.name ?? '').trim(),
+            fee: Math.max(0, Number(t.fee) || 0),
+            windowLabel: String(t.windowLabel ?? '').trim() || 'Standard',
+          }))
+          .filter((t) => t.name.length > 0)
+      : prev.estimatorTurnarounds;
+
+    const estimatorAddons = Array.isArray(body.estimatorAddons)
+      ? body.estimatorAddons
+          .map((a, idx) => ({
+            id: String(a.id ?? `addon-${Date.now()}-${idx}`).trim() || `addon-${Date.now()}-${idx}`,
+            label: String(a.label ?? '').trim(),
+            shortLabel: String(a.shortLabel ?? a.label ?? '').trim(),
+            price: Math.max(0, Number(a.price) || 0),
+          }))
+          .filter((a) => a.label.length > 0)
+      : prev.estimatorAddons;
+
+    if (estimatorGarments.length === 0 || estimatorTurnarounds.length === 0) {
+      res.status(400).json({ error: 'Cost estimator must have at least one garment and one turnaround speed.' });
+      return;
+    }
+
+    store.catalog = {
+      services,
+      designPatterns,
+      matchingRates,
+      estimatorGarments,
+      estimatorTurnarounds,
+      estimatorAddons,
+    };
+    saveStore(store);
+    res.json({ catalog: store.catalog });
   });
 
   // --- Frontend Serving (Vite in dev, dist/ in prod) ---

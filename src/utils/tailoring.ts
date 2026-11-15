@@ -1,51 +1,26 @@
 import type {
+  AddonOption,
+  CatalogConfig,
   CustomerReview,
+  DesignPattern,
+  GarmentOption,
+  MatchingRateItem,
   OrderStatus,
   ReviewSummary,
+  ServiceOffering,
   TailoringOrder,
+  TurnaroundOption,
 } from '../types.ts';
 
-export interface GarmentOption {
-  id: string;
-  name: string;
-  basePrice: number;
-  category: 'Blouse' | 'Suit & Kurti' | 'Bridal & Gown';
-}
-
-export interface TurnaroundOption {
-  id: string;
-  name: string;
-  fee: number;
-  windowLabel: string;
-}
-
-export interface AddonOption {
-  id: string;
-  label: string;
-  shortLabel: string;
-  price: number;
-}
-
-export interface ServiceOffering {
-  number: string;
-  title: string;
-  description: string;
-  startingPrice: number;
-  highlights: string[];
-}
-
-export interface MatchingRateItem {
-  name: string;
-  spec: string;
-  rateRange: string;
-  unit: string;
-}
-
-export interface DesignPattern {
-  name: string;
-  category: string;
-  note: string;
-}
+export type {
+  AddonOption,
+  CatalogConfig,
+  DesignPattern,
+  GarmentOption,
+  MatchingRateItem,
+  ServiceOffering,
+  TurnaroundOption,
+};
 
 export const GARMENT_OPTIONS: GarmentOption[] = [
   { id: 'alite-blouse', name: 'Alite Cut Designer Blouse', basePrice: 350, category: 'Blouse' },
@@ -154,11 +129,21 @@ export const DESIGN_PATTERNS: DesignPattern[] = [
   { name: 'Alia Empire Kurti', category: 'Ethnic Kurti', note: 'V-empire gathers tailored for festive occasions' },
 ];
 
+export const DEFAULT_CATALOG: CatalogConfig = {
+  services: SERVICE_OFFERINGS,
+  designPatterns: DESIGN_PATTERNS,
+  matchingRates: MATCHING_CENTER_RATES,
+  estimatorGarments: GARMENT_OPTIONS,
+  estimatorTurnarounds: TURNAROUND_OPTIONS,
+  estimatorAddons: ADDON_OPTIONS,
+};
+
 export interface EstimateInput {
   garmentId: string;
   turnaroundId: string;
   addonIds: string[];
   whatsappDigits?: string;
+  catalog?: Pick<CatalogConfig, 'estimatorGarments' | 'estimatorTurnarounds' | 'estimatorAddons'>;
 }
 
 export interface EstimateResult {
@@ -173,15 +158,19 @@ export interface EstimateResult {
 }
 
 export function calculateStitchingEstimate(input: EstimateInput): EstimateResult {
-  const garment = GARMENT_OPTIONS.find((g) => g.id === input.garmentId) ?? GARMENT_OPTIONS[0];
-  const turnaround = TURNAROUND_OPTIONS.find((t) => t.id === input.turnaroundId) ?? TURNAROUND_OPTIONS[0];
+  const garments = input.catalog?.estimatorGarments?.length ? input.catalog.estimatorGarments : GARMENT_OPTIONS;
+  const turnarounds = input.catalog?.estimatorTurnarounds?.length ? input.catalog.estimatorTurnarounds : TURNAROUND_OPTIONS;
+  const addons = input.catalog?.estimatorAddons ?? ADDON_OPTIONS;
+
+  const garment = garments.find((g) => g.id === input.garmentId) ?? garments[0];
+  const turnaround = turnarounds.find((t) => t.id === input.turnaroundId) ?? turnarounds[0];
 
   const uniqueAddonIds = Array.from(new Set(input.addonIds));
-  const selectedAddons = ADDON_OPTIONS.filter((a) => uniqueAddonIds.includes(a.id));
+  const selectedAddons = addons.filter((a) => uniqueAddonIds.includes(a.id));
 
   const addonsTotal = selectedAddons.reduce((sum, item) => sum + item.price, 0);
   const total = garment.basePrice + turnaround.fee + addonsTotal;
-  const selectedAddonLabels = selectedAddons.map((a) => a.shortLabel);
+  const selectedAddonLabels = selectedAddons.map((a) => a.shortLabel || a.label);
 
   let summary = garment.name;
   if (selectedAddonLabels.length > 0) {
@@ -190,7 +179,7 @@ export function calculateStitchingEstimate(input: EstimateInput): EstimateResult
   if (turnaround.fee > 0) {
     summary += ` (${turnaround.name})`;
   } else {
-    summary += ' · Standard Delivery';
+    summary += ` · ${turnaround.name}`;
   }
 
   const digits = (input.whatsappDigits ?? '917449531663').replace(/\D/g, '') || '917449531663';

@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { MATCHING_CENTER_RATES } from '../utils/tailoring.ts';
-import type { ShopDetails } from '../types.ts';
+import type { MatchingRateItem, ShopDetails } from '../types.ts';
 import matchingFabricsImg from '../assets/images/matching_center_fabrics_1794727217954.jpg';
 
 interface MatchingCenterSectionProps {
   shopDetails: ShopDetails;
+  matchingRates: MatchingRateItem[];
 }
 
-export function MatchingCenterSection({ shopDetails }: MatchingCenterSectionProps) {
+export function MatchingCenterSection({ shopDetails, matchingRates }: MatchingCenterSectionProps) {
   const [imageError, setImageError] = useState(false);
   const waMatchUrl = `https://api.whatsapp.com/send?phone=${shopDetails.whatsappDigits}&text=${encodeURIComponent(
     'Hi Deeksha Tailors, I have a saree and want to check if matching lining/fall is available.',
@@ -62,8 +62,8 @@ export function MatchingCenterSection({ shopDetails }: MatchingCenterSectionProp
           </div>
 
           <div className="divide-y divide-stone-200">
-            {MATCHING_CENTER_RATES.map((item) => (
-              <div key={item.name} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-stone-50/70 transition-colors">
+            {matchingRates.map((item, idx) => (
+              <div key={`${item.name}-${idx}`} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-stone-50/70 transition-colors">
                 <div>
                   <p className="text-sm font-semibold text-stone-900">{item.name}</p>
                   <p className="text-xs text-stone-500 mt-0.5">{item.spec}</p>
