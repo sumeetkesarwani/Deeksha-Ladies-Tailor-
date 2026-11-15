@@ -26,9 +26,14 @@ export function Navbar({ authUser, activeView, onOpenLogin, onLogout, onNavigate
         <a
           href="#top"
           onClick={() => onNavigateView('public')}
-          className="font-display text-base sm:text-xl font-semibold tracking-tight text-stone-900 whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-2.5 font-display text-base sm:text-xl font-semibold tracking-tight text-stone-900 whitespace-nowrap shrink-0"
         >
-          Deeksha Ladies Tailor
+          <img
+            src="/assets/aistudio/1794735885525_5eb76f5f.png"
+            alt="Deeksha Ladies Tailors & Matching Center logo"
+            className="h-9 w-9 sm:h-10 sm:w-10 object-contain rounded-lg border border-stone-200 bg-[#FAF8F6] shrink-0"
+          />
+          <span>Deeksha Ladies Tailor</span>
         </a>
 
         <nav aria-label="Primary navigation" className="hidden md:flex items-center gap-7 text-sm font-medium text-stone-600">

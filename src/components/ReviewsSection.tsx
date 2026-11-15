@@ -2,12 +2,13 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { ArrowUpRight, Star } from 'lucide-react';
 import type { CustomerReview, ReviewSummary, ShopDetails } from '../types.ts';
 import { validateReviewInput } from '../utils/tailoring.ts';
+import { publishReviewToRtdb } from '../utils/firebaseRtdb.ts';
 
 interface ReviewsSectionProps {
   reviews: CustomerReview[];
   reviewSummary: ReviewSummary;
   shopDetails: ShopDetails;
-  onReviewAdded: (review: CustomerReview, summary: ReviewSummary) => void;
+  onReviewAdded: (review: CustomerReview, summary?: ReviewSummary) => void;
 }
 
 const SERVICE_CHOICES = [
@@ -35,10 +36,12 @@ export function ReviewsSection({
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
+  const visibleReviews = useMemo(() => reviews.filter((r) => r.visible !== false), [reviews]);
+
   const filteredReviews = useMemo(() => {
-    if (sourceFilter === 'All') return reviews;
-    return reviews.filter((r) => r.source === sourceFilter);
-  }, [reviews, sourceFilter]);
+    if (sourceFilter === 'All') return visibleReviews;
+    return visibleReviews.filter((r) => r.source === sourceFilter);
+  }, [visibleReviews, sourceFilter]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -53,26 +56,57 @@ export function ReviewsSection({
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName, rating, service, comment }),
-      });
-      const data = (await res.json()) as {
-        review?: CustomerReview;
-        reviewSummary?: ReviewSummary;
-        error?: string;
+      const reviewPayload = {
+        customerName: customerName.trim(),
+        rating: Number(rating),
+        service: service.trim(),
+        comment: comment.trim(),
       };
-      if (!res.ok || !data.review || !data.reviewSummary) {
-        setFormError(data.error || 'Could not submit review.');
-        return;
+
+      let created: CustomerReview | undefined;
+      let serverSummary: ReviewSummary | undefined;
+
+      try {
+        const res = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reviewPayload),
+        });
+        const data = (await res.json()) as {
+          review?: CustomerReview;
+          reviewSummary?: ReviewSummary;
+        };
+        if (res.ok && data.review) {
+          created = data.review;
+          serverSummary = data.reviewSummary;
+        }
+      } catch {
+        // Fallback directly to Firebase RTDB if local server is unreachable
       }
-      onReviewAdded(data.review, data.reviewSummary);
+
+      if (!created) {
+        created = {
+          id: `rev-${Date.now()}`,
+          customerName: reviewPayload.customerName,
+          rating: reviewPayload.rating,
+          service: reviewPayload.service,
+          comment: reviewPayload.comment,
+          source: 'Website Customer',
+          visitDate: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+          visible: true,
+          featured: false,
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      await publishReviewToRtdb(created);
+
+      onReviewAdded(created, serverSummary);
       setCustomerName('');
       setRating(5);
       setComment('');
       setShowForm(false);
-      setFormSuccess('Thank you! Your customer review is now published.');
+      setFormSuccess('Thank you! Your customer review is now published across all devices.');
     } catch {
       setFormError('Network error while saving your review.');
     } finally {

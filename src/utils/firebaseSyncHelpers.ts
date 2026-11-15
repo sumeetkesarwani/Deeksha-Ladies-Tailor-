@@ -1,3 +1,4 @@
+import type { CustomerReview } from '../types.ts';
 import {
   mapBillingHtmlOrders,
   normalizeIndianPhone,
@@ -52,7 +53,7 @@ export function stripUndefined<T>(value: T): T {
   return value;
 }
 
-export function extractRtdbRecords<T extends Record<string, unknown>>(snapshotVal: unknown): T[] {
+export function extractRtdbRecords<T extends object = Record<string, unknown>>(snapshotVal: unknown): T[] {
   if (!snapshotVal) return [];
   if (Array.isArray(snapshotVal)) {
     return snapshotVal.filter((item): item is T => Boolean(item && typeof item === 'object'));
@@ -142,3 +143,69 @@ export function computeRtdbCollectionPatch<T extends Record<string, unknown>>(pa
 
   return hasChanges ? patch : null;
 }
+
+const VALID_REVIEW_SOURCES = new Set<CustomerReview['source']>([
+  'Google Business Profile',
+  'Justdial Verified',
+  'Boutique Counter',
+  'Website Customer',
+]);
+
+export function normalizeReviewRecord(raw: unknown): CustomerReview | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const id = String(r.id ?? '').trim();
+  const customerName = String(r.customerName ?? '').trim();
+  const comment = String(r.comment ?? '').trim();
+  if (!id || !customerName || !comment) return null;
+
+  const rawSource = String(r.source ?? 'Website Customer').trim() as CustomerReview['source'];
+  const source: CustomerReview['source'] = VALID_REVIEW_SOURCES.has(rawSource) ? rawSource : 'Website Customer';
+  const rawRating = Number(r.rating);
+  const rating = Number.isFinite(rawRating) ? Math.min(5, Math.max(1, Math.round(rawRating))) : 5;
+
+  return {
+    id,
+    customerName,
+    rating,
+    service: String(r.service ?? 'Tailoring Service').trim() || 'Tailoring Service',
+    comment,
+    source,
+    visitDate: String(r.visitDate ?? '').trim() || 'Verified Visit',
+    visible: r.visible !== false,
+    featured: Boolean(r.featured),
+    ...(typeof r.ownerReply === 'string' && r.ownerReply.trim() ? { ownerReply: r.ownerReply.trim() } : {}),
+    createdAt: String(r.createdAt ?? '').trim() || new Date().toISOString(),
+  };
+}
+
+/**
+ * Combines Firebase RTDB `/reviews` records with baseline/local reviews so newly submitted
+ * reviews appear immediately on all devices without erasing verified baseline reviews.
+ */
+export function mergeReviewsWithCloud(params: {
+  cloudReviews: unknown[];
+  baselineReviews: CustomerReview[];
+  reviewsInitialized: boolean;
+}): CustomerReview[] {
+  const { cloudReviews, baselineReviews, reviewsInitialized } = params;
+  const normalizedCloud = cloudReviews
+    .map(normalizeReviewRecord)
+    .filter((item): item is CustomerReview => item !== null);
+
+  if (reviewsInitialized) {
+    return [...normalizedCloud].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  const byId = new Map<string, CustomerReview>();
+  for (const base of baselineReviews) {
+    const clean = normalizeReviewRecord(base);
+    if (clean) byId.set(clean.id, clean);
+  }
+  for (const cloudItem of normalizedCloud) {
+    byId.set(cloudItem.id, cloudItem);
+  }
+
+  return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+

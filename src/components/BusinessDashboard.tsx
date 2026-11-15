@@ -18,16 +18,27 @@ import type {
   CatalogConfig,
   CustomerReview,
   FittingAppointment,
-  ReviewSummary,
   ShopDetails,
 } from '../types.ts';
-import { BILLING_STORAGE_KEY } from '../utils/tailoring.ts';
+import {
+  BILLING_STORAGE_KEY,
+} from '../utils/tailoring.ts';
 import {
   ATTENDANCE_STORAGE_KEY,
   PRODUCTION_STORAGE_KEY,
   STAFF_STORAGE_KEY,
 } from '../utils/firebaseSyncHelpers.ts';
-import { createRtdbCollectionSync, type RtdbCollectionController } from '../utils/firebaseRtdb.ts';
+import {
+  createRtdbCollectionSync,
+  deleteReviewFromRtdb,
+  saveAppointmentToRtdb,
+  saveCatalogToRtdb,
+  saveShopDetailsToRtdb,
+  subscribeAppointmentsRtdb,
+  subscribePublicStorefrontRtdb,
+  syncAllReviewsToRtdb,
+  type RtdbCollectionController,
+} from '../utils/firebaseRtdb.ts';
 import { CatalogEditorTab } from './CatalogEditorTab.tsx';
 
 const BILLING_HTML_PATH = '/assets/aistudio/Deeksha_Ladies_Tailors___Matching_Center_cf67b9a2.html';
@@ -56,10 +67,13 @@ interface BillingIframeWindow extends Window {
 interface BusinessDashboardProps {
   authUser: AuthUser;
   authToken: string;
+  initialShopDetails: ShopDetails;
+  initialCatalog: CatalogConfig;
+  initialReviews: CustomerReview[];
   onLogout: () => void;
   onShopUpdated: (shopDetails: ShopDetails) => void;
   onCatalogUpdated: (catalog: CatalogConfig) => void;
-  onReviewsUpdated: (reviews: CustomerReview[], summary: ReviewSummary) => void;
+  onReviewsUpdated: (reviews: CustomerReview[]) => void;
 }
 
 type AdminTab = 'billing' | 'appointments' | 'catalog' | 'reviews' | 'settings';
@@ -67,6 +81,9 @@ type AdminTab = 'billing' | 'appointments' | 'catalog' | 'reviews' | 'settings';
 export function BusinessDashboard({
   authUser,
   authToken,
+  initialShopDetails,
+  initialCatalog,
+  initialReviews,
   onLogout,
   onShopUpdated,
   onCatalogUpdated,
@@ -75,18 +92,26 @@ export function BusinessDashboard({
   const [activeTab, setActiveTab] = useState<AdminTab>('billing');
   const [billingExpanded, setBillingExpanded] = useState(false);
   const [billingReloadKey, setBillingReloadKey] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [savingCatalog, setSavingCatalog] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
   const [appointments, setAppointments] = useState<FittingAppointment[]>([]);
-  const [reviews, setReviews] = useState<CustomerReview[]>([]);
-  const [shopForm, setShopForm] = useState<ShopDetails | null>(null);
-  const [catalog, setCatalog] = useState<CatalogConfig | null>(null);
+  const [reviews, setReviews] = useState<CustomerReview[]>(initialReviews);
+  const [shopForm, setShopForm] = useState<ShopDetails | null>(initialShopDetails);
+  const [catalog, setCatalog] = useState<CatalogConfig | null>(initialCatalog);
+
+  const baselineReviewsRef = useRef<CustomerReview[]>(initialReviews);
 
   // Review reply editing
-  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>(() => {
+    const drafts: Record<string, string> = {};
+    initialReviews.forEach((r) => {
+      drafts[r.id] = r.ownerReply ?? '';
+    });
+    return drafts;
+  });
 
   const billingIframeRef = useRef<HTMLIFrameElement | null>(null);
   const ordersSyncRef = useRef<RtdbCollectionController<Record<string, unknown>> | null>(null);
@@ -254,24 +279,42 @@ export function BusinessDashboard({
         reviews: CustomerReview[];
         shopDetails: ShopDetails;
         catalog: CatalogConfig;
-        reviewSummary: ReviewSummary;
         error?: string;
       };
       if (!res.ok) {
         setError(data.error || 'Could not load owner portal data.');
         return;
       }
-      setAppointments(data.appointments);
-      setReviews(data.reviews);
+      if (Array.isArray(data.appointments) && data.appointments.length > 0) {
+        setAppointments((prev) => {
+          const byId = new Map<string, FittingAppointment>();
+          data.appointments.forEach((a) => byId.set(a.id, a));
+          prev.forEach((a) => {
+            if (!byId.has(a.id)) byId.set(a.id, a);
+          });
+          return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        });
+      }
+      if (Array.isArray(data.reviews) && data.reviews.length > 0) {
+        baselineReviewsRef.current = data.reviews;
+        setReviews((prev) => {
+          const byId = new Map<string, CustomerReview>();
+          data.reviews.forEach((r) => byId.set(r.id, r));
+          prev.forEach((r) => {
+            if (!byId.has(r.id)) byId.set(r.id, r);
+          });
+          return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        });
+      }
       setShopForm(data.shopDetails);
       setCatalog(data.catalog);
       const drafts: Record<string, string> = {};
       data.reviews.forEach((r) => {
         drafts[r.id] = r.ownerReply ?? '';
       });
-      setReplyDrafts(drafts);
+      setReplyDrafts((prev) => ({ ...drafts, ...prev }));
     } catch {
-      setError('Unable to reach server.');
+      // Keep Firebase RTDB data active even if server endpoint is offline
     } finally {
       setLoading(false);
     }
@@ -282,38 +325,62 @@ export function BusinessDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken]);
 
+  useEffect(() => {
+    const unsubAppointments = subscribeAppointmentsRtdb((cloudAppointments) => {
+      setAppointments(cloudAppointments);
+    });
+
+    const unsubStorefront = subscribePublicStorefrontRtdb({
+      getBaselineReviews: () => baselineReviewsRef.current,
+      onReviewsUpdate: (cloudReviews) => {
+        setReviews(cloudReviews);
+        setReplyDrafts((prev) => {
+          const next = { ...prev };
+          cloudReviews.forEach((r) => {
+            if (!(r.id in next)) {
+              next[r.id] = r.ownerReply ?? '';
+            }
+          });
+          return next;
+        });
+      },
+      onShopDetailsUpdate: (cloudShop) => {
+        setShopForm(cloudShop);
+      },
+      onCatalogUpdate: (cloudCatalog) => {
+        setCatalog(cloudCatalog);
+      },
+    });
+
+    return () => {
+      unsubAppointments();
+      unsubStorefront();
+    };
+  }, []);
+
   const flashNotice = (msg: string) => {
     setNotice(msg);
     setTimeout(() => setNotice(''), 3000);
   };
 
-
   const handleAppointmentStatus = async (id: string, status: AppointmentStatus) => {
+    const target = appointments.find((a) => a.id === id);
+    if (!target) return;
+    const updated: FittingAppointment = { ...target, status };
+    setAppointments((prev) => prev.map((a) => (a.id === id ? updated : a)));
+
     try {
-      const res = await fetch(`/api/admin/appointments/${id}`, {
-        method: 'PATCH',
-        headers: authHeaders,
-        body: JSON.stringify({ status }),
-      });
-      const data = (await res.json()) as { appointment?: FittingAppointment };
-      if (res.ok && data.appointment) {
-        setAppointments((prev) => prev.map((a) => (a.id === id ? data.appointment! : a)));
-        flashNotice(`Appointment updated to ${status}.`);
+      await saveAppointmentToRtdb(updated);
+      if (authToken) {
+        await fetch(`/api/admin/appointments/${id}`, {
+          method: 'PATCH',
+          headers: authHeaders,
+          body: JSON.stringify({ status }),
+        });
       }
+      flashNotice(`Appointment updated to ${status} across all devices.`);
     } catch {
       setError('Could not update appointment.');
-    }
-  };
-
-  const syncPublicReviews = async () => {
-    try {
-      const res = await fetch('/api/public/bootstrap');
-      if (res.ok) {
-        const data = (await res.json()) as { reviews: CustomerReview[]; reviewSummary: ReviewSummary };
-        onReviewsUpdated(data.reviews, data.reviewSummary);
-      }
-    } catch {
-      // ignore background sync error
     }
   };
 
@@ -321,34 +388,56 @@ export function BusinessDashboard({
     id: string,
     payload: { visible?: boolean; featured?: boolean; ownerReply?: string },
   ) => {
-    try {
-      const res = await fetch(`/api/admin/reviews/${id}`, {
-        method: 'PATCH',
-        headers: authHeaders,
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { review?: CustomerReview };
-      if (res.ok && data.review) {
-        setReviews((prev) => prev.map((r) => (r.id === id ? data.review! : r)));
-        await syncPublicReviews();
-        flashNotice('Review updated.');
+    const nextReviews = reviews.map((r) => {
+      if (r.id !== id) return r;
+      const updated: CustomerReview = {
+        ...r,
+        ...(typeof payload.visible === 'boolean' ? { visible: payload.visible } : {}),
+        ...(typeof payload.featured === 'boolean' ? { featured: payload.featured } : {}),
+      };
+      if (typeof payload.ownerReply === 'string') {
+        const trimmedReply = payload.ownerReply.trim();
+        if (trimmedReply) {
+          updated.ownerReply = trimmedReply;
+        } else {
+          delete updated.ownerReply;
+        }
       }
+      return updated;
+    });
+
+    setReviews(nextReviews);
+    onReviewsUpdated(nextReviews);
+
+    try {
+      await syncAllReviewsToRtdb(nextReviews);
+      if (authToken) {
+        await fetch(`/api/admin/reviews/${id}`, {
+          method: 'PATCH',
+          headers: authHeaders,
+          body: JSON.stringify(payload),
+        });
+      }
+      flashNotice('Review updated and synced across all devices.');
     } catch {
       setError('Could not update review.');
     }
   };
 
   const handleDeleteReview = async (id: string) => {
+    const remaining = reviews.filter((r) => r.id !== id);
+    setReviews(remaining);
+    onReviewsUpdated(remaining);
+
     try {
-      const res = await fetch(`/api/admin/reviews/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        setReviews((prev) => prev.filter((r) => r.id !== id));
-        await syncPublicReviews();
-        flashNotice('Review deleted.');
+      await deleteReviewFromRtdb(id, remaining);
+      if (authToken) {
+        await fetch(`/api/admin/reviews/${id}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        });
       }
+      flashNotice('Review deleted across all devices.');
     } catch {
       setError('Could not delete review.');
     }
@@ -359,22 +448,28 @@ export function BusinessDashboard({
     if (!shopForm) return;
     setError('');
     try {
-      const res = await fetch('/api/admin/shop', {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify(shopForm),
-      });
-      const data = (await res.json()) as { shopDetails?: ShopDetails; error?: string };
-      if (!res.ok || !data.shopDetails) {
-        setError(data.error || 'Could not update shop details.');
-        return;
+      let finalShop = shopForm;
+      if (authToken) {
+        try {
+          const res = await fetch('/api/admin/shop', {
+            method: 'PUT',
+            headers: authHeaders,
+            body: JSON.stringify(shopForm),
+          });
+          const data = (await res.json()) as { shopDetails?: ShopDetails };
+          if (res.ok && data.shopDetails) {
+            finalShop = data.shopDetails;
+          }
+        } catch {
+          // continue syncing to RTDB
+        }
       }
-      setShopForm(data.shopDetails);
-      onShopUpdated(data.shopDetails);
-      await syncPublicReviews();
-      flashNotice('Shop details & Google links updated.');
+      await saveShopDetailsToRtdb(finalShop);
+      setShopForm(finalShop);
+      onShopUpdated(finalShop);
+      flashNotice('Shop details & Google links synced across all devices.');
     } catch {
-      setError('Network error saving shop details.');
+      setError('Error saving shop details.');
     }
   };
 
@@ -382,21 +477,28 @@ export function BusinessDashboard({
     setError('');
     setSavingCatalog(true);
     try {
-      const res = await fetch('/api/admin/catalog', {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify(nextCatalog),
-      });
-      const data = (await res.json()) as { catalog?: CatalogConfig; error?: string };
-      if (!res.ok || !data.catalog) {
-        setError(data.error || 'Could not update services & pricing.');
-        return;
+      let finalCatalog = nextCatalog;
+      if (authToken) {
+        try {
+          const res = await fetch('/api/admin/catalog', {
+            method: 'PUT',
+            headers: authHeaders,
+            body: JSON.stringify(nextCatalog),
+          });
+          const data = (await res.json()) as { catalog?: CatalogConfig };
+          if (res.ok && data.catalog) {
+            finalCatalog = data.catalog;
+          }
+        } catch {
+          // continue syncing to RTDB
+        }
       }
-      setCatalog(data.catalog);
-      onCatalogUpdated(data.catalog);
-      flashNotice('All services, estimator prices, and rates updated live.');
+      await saveCatalogToRtdb(finalCatalog);
+      setCatalog(finalCatalog);
+      onCatalogUpdated(finalCatalog);
+      flashNotice('All services, estimator prices, and rates synced across all devices.');
     } catch {
-      setError('Network error saving pricing and services.');
+      setError('Error saving pricing and services.');
     } finally {
       setSavingCatalog(false);
     }
@@ -407,10 +509,17 @@ export function BusinessDashboard({
       {/* Sidebar */}
       <aside className="lg:w-64 bg-white border-b lg:border-b-0 lg:border-r border-stone-200 p-4 sm:p-5 flex flex-col justify-between gap-6 shrink-0">
         <div className="space-y-4">
-          <div className="px-2">
-            <p className="text-xs text-stone-500">Signed in as</p>
-            <p className="text-sm font-semibold text-stone-950 truncate">{authUser.ownerName}</p>
-            <p className="font-mono-tabular text-xs text-stone-500 truncate">ID: {authUser.businessId}</p>
+          <div className="px-2 flex items-center gap-3">
+            <img
+              src="/assets/aistudio/1794735885525_5eb76f5f.png"
+              alt="Deeksha Ladies Tailors & Matching Center logo"
+              className="w-11 h-11 object-contain rounded-xl border border-stone-200 bg-[#FAF8F6] shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-stone-500">Signed in as</p>
+              <p className="text-sm font-semibold text-stone-950 truncate">{authUser.ownerName}</p>
+              <p className="font-mono-tabular text-[11px] text-stone-500 truncate">{authUser.businessId}</p>
+            </div>
           </div>
 
           <nav aria-label="Owner Portal Sections" className="grid grid-cols-2 lg:grid-cols-1 gap-1.5">

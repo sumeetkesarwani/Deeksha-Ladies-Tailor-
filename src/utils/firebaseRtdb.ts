@@ -1,12 +1,15 @@
-import { get, onValue, ref, remove, update, type Unsubscribe } from 'firebase/database';
+import { get, onValue, ref, remove, set, update, type Unsubscribe } from 'firebase/database';
 import { rtdb } from '../firebase.ts';
+import type { CatalogConfig, CustomerReview, FittingAppointment, ShopDetails } from '../types.ts';
 import type { TrackedOrderResult } from './tailoring.ts';
 import {
   computeRtdbCollectionPatch,
   extractRtdbRecords,
   filterCustomerPublicOrders,
+  mergeReviewsWithCloud,
   sanitizeRtdbKey,
   sortOrdersByNumberDesc,
+  stripUndefined,
 } from './firebaseSyncHelpers.ts';
 
 export interface RtdbCollectionController<T extends Record<string, unknown>> {
@@ -26,6 +29,171 @@ export async function queryPublicOrdersFromRtdb(searchQuery: string): Promise<Tr
   }
   const records = extractRtdbRecords(snapshot.val());
   return filterCustomerPublicOrders(records, searchQuery);
+}
+
+/**
+ * Publishes or updates a single customer review in Firebase RTDB (/reviews/{id})
+ * so all devices see new customer reviews and shop replies immediately.
+ */
+export async function publishReviewToRtdb(review: CustomerReview): Promise<boolean> {
+  try {
+    const key = sanitizeRtdbKey(review.id);
+    await set(ref(rtdb, `reviews/${key}`), stripUndefined(review));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function syncAllReviewsToRtdb(reviews: CustomerReview[]): Promise<boolean> {
+  try {
+    const reviewsMap: Record<string, CustomerReview> = {};
+    for (const r of reviews) {
+      reviewsMap[sanitizeRtdbKey(r.id)] = stripUndefined(r);
+    }
+    await update(ref(rtdb), {
+      reviews: reviewsMap,
+      'site/reviewsInitialized': true,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteReviewFromRtdb(reviewId: string, remainingReviews?: CustomerReview[]): Promise<boolean> {
+  try {
+    if (remainingReviews) {
+      await syncAllReviewsToRtdb(remainingReviews);
+    } else {
+      await remove(ref(rtdb, `reviews/${sanitizeRtdbKey(reviewId)}`));
+      await set(ref(rtdb, 'site/reviewsInitialized'), true);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveShopDetailsToRtdb(shopDetails: ShopDetails): Promise<boolean> {
+  try {
+    await set(ref(rtdb, 'site/shopDetails'), stripUndefined(shopDetails));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveCatalogToRtdb(catalog: CatalogConfig): Promise<boolean> {
+  try {
+    await set(ref(rtdb, 'site/catalog'), stripUndefined(catalog));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveAppointmentToRtdb(appointment: FittingAppointment): Promise<boolean> {
+  try {
+    await set(ref(rtdb, `appointments/${sanitizeRtdbKey(appointment.id)}`), stripUndefined(appointment));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function subscribeAppointmentsRtdb(
+  onAppointmentsUpdate: (appointments: FittingAppointment[]) => void,
+): Unsubscribe {
+  return onValue(
+    ref(rtdb, 'appointments'),
+    (snapshot) => {
+      if (!snapshot.exists()) return;
+      const items = extractRtdbRecords<FittingAppointment>(snapshot.val()).sort((a, b) =>
+        String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')),
+      );
+      onAppointmentsUpdate(items);
+    },
+    () => {
+      // ignore read permission errors gracefully
+    },
+  );
+}
+
+/**
+ * Subscribes to live public storefront updates from Firebase RTDB (`reviews`, `site/shopDetails`, `site/catalog`)
+ * so customer reviews and Admin edits appear across all devices without needing reloads.
+ */
+export function subscribePublicStorefrontRtdb(options: {
+  getBaselineReviews: () => CustomerReview[];
+  onReviewsUpdate: (allReviews: CustomerReview[]) => void;
+  onShopDetailsUpdate: (shopDetails: ShopDetails) => void;
+  onCatalogUpdate: (catalog: CatalogConfig) => void;
+}): () => void {
+  const { getBaselineReviews, onReviewsUpdate, onShopDetailsUpdate, onCatalogUpdate } = options;
+
+  let latestCloudReviews: unknown[] = [];
+  let reviewsInitialized = false;
+  let hasReviewsSnapshot = false;
+
+  const emitMergedReviews = () => {
+    if (!hasReviewsSnapshot && !reviewsInitialized) return;
+    const merged = mergeReviewsWithCloud({
+      cloudReviews: latestCloudReviews,
+      baselineReviews: getBaselineReviews(),
+      reviewsInitialized,
+    });
+    onReviewsUpdate(merged);
+  };
+
+  const unsubReviews = onValue(
+    ref(rtdb, 'reviews'),
+    (snapshot) => {
+      hasReviewsSnapshot = true;
+      latestCloudReviews = snapshot.exists() ? extractRtdbRecords(snapshot.val()) : [];
+      emitMergedReviews();
+    },
+    () => {
+      // Keep local/server reviews if Firebase read fails
+    },
+  );
+
+  const unsubSite = onValue(
+    ref(rtdb, 'site'),
+    (snapshot) => {
+      if (!snapshot.exists()) return;
+      const siteVal = snapshot.val() as {
+        reviewsInitialized?: boolean;
+        shopDetails?: ShopDetails;
+        catalog?: CatalogConfig;
+      } | null;
+      if (!siteVal || typeof siteVal !== 'object') return;
+
+      if (typeof siteVal.reviewsInitialized === 'boolean') {
+        reviewsInitialized = siteVal.reviewsInitialized;
+        emitMergedReviews();
+      }
+      if (siteVal.shopDetails && typeof siteVal.shopDetails === 'object' && siteVal.shopDetails.businessName) {
+        onShopDetailsUpdate(siteVal.shopDetails);
+      }
+      if (
+        siteVal.catalog &&
+        typeof siteVal.catalog === 'object' &&
+        Array.isArray(siteVal.catalog.estimatorGarments) &&
+        siteVal.catalog.estimatorGarments.length > 0
+      ) {
+        onCatalogUpdate(siteVal.catalog);
+      }
+    },
+    () => {
+      // Keep server-provided shopDetails & catalog if Firebase read fails
+    },
+  );
+
+  return () => {
+    unsubReviews();
+    unsubSite();
+  };
 }
 
 /**

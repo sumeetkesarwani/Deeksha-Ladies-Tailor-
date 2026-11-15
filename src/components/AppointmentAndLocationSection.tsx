@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ArrowUpRight, CheckCircle2, Clock, MapPin, Phone } from 'lucide-react';
 import type { FittingAppointment, ShopDetails } from '../types.ts';
 import { buildAppointmentWhatsAppUrl, validateAppointmentInput } from '../utils/tailoring.ts';
+import { saveAppointmentToRtdb } from '../utils/firebaseRtdb.ts';
 
 interface AppointmentAndLocationSectionProps {
   shopDetails: ShopDetails;
@@ -39,32 +40,49 @@ export function AppointmentAndLocationSection({ shopDetails }: AppointmentAndLoc
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: check.normalizedPhone,
-          preferredDate: preferredDate || 'Earliest Available',
-          timeSlot,
-          notes: notes.trim() || 'Stitching consultation',
-        }),
-      });
-      const data = (await res.json()) as { appointment?: FittingAppointment; error?: string };
-      if (!res.ok || !data.appointment) {
-        setError(data.error || 'Could not save your appointment.');
-        return;
+      const payload = {
+        name: name.trim(),
+        phone: check.normalizedPhone,
+        preferredDate: preferredDate || 'Earliest Available',
+        timeSlot,
+        notes: notes.trim() || 'Stitching consultation',
+      };
+
+      let created: FittingAppointment | undefined;
+      try {
+        const res = await fetch('/api/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = (await res.json()) as { appointment?: FittingAppointment; error?: string };
+        if (res.ok && data.appointment) {
+          created = data.appointment;
+        }
+      } catch {
+        // Fall through to Firebase RTDB direct persistence
       }
 
+      if (!created) {
+        created = {
+          id: `apt-${Date.now()}`,
+          ...payload,
+          status: 'Pending',
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      await saveAppointmentToRtdb(created);
+
       const whatsappUrl = buildAppointmentWhatsAppUrl(shopDetails.whatsappDigits, {
-        name: data.appointment.name,
-        phone: data.appointment.phone,
-        date: data.appointment.preferredDate,
-        timeSlot: data.appointment.timeSlot,
-        notes: data.appointment.notes,
+        name: created.name,
+        phone: created.phone,
+        date: created.preferredDate,
+        timeSlot: created.timeSlot,
+        notes: created.notes,
       });
 
-      setConfirmed({ appointment: data.appointment, whatsappUrl });
+      setConfirmed({ appointment: created, whatsappUrl });
       setName('');
       setPhone('');
       setPreferredDate('');

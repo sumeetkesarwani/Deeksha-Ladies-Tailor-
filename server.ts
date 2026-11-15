@@ -43,6 +43,20 @@ const DATA_DIR = path.resolve(process.cwd(), 'data');
 const STORE_PATH = path.join(DATA_DIR, 'store.json');
 const SESSION_SECRET = process.env.SESSION_SECRET || 'deeksha_tailors_rajarhat_session_key_2026';
 const COOKIE_NAME = 'deeksha_owner_session';
+const FIREBASE_RTDB_URL = 'https://deeksha-ladies-tailors-default-rtdb.firebaseio.com';
+
+async function mirrorToFirebaseRtdb(rtdbPath: string, method: 'PUT' | 'DELETE', data?: unknown): Promise<void> {
+  try {
+    const url = `${FIREBASE_RTDB_URL}/${rtdbPath}.json`;
+    await fetch(url, {
+      method,
+      headers: method === 'PUT' ? { 'Content-Type': 'application/json' } : undefined,
+      body: method === 'PUT' ? JSON.stringify(data ?? null) : undefined,
+    });
+  } catch {
+    // Best-effort sync; client SDK also writes with authenticated user credentials
+  }
+}
 
 function hashPassword(password: string, salt: string): string {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -295,6 +309,7 @@ async function startServer(): Promise<void> {
     };
     store.appointments.unshift(created);
     saveStore(store);
+    void mirrorToFirebaseRtdb(`appointments/${created.id}`, 'PUT', created);
 
     res.status(201).json({ appointment: created });
   });
@@ -332,6 +347,7 @@ async function startServer(): Promise<void> {
     };
     store.reviews.unshift(created);
     saveStore(store);
+    void mirrorToFirebaseRtdb(`reviews/${created.id}`, 'PUT', created);
 
     const reviewSummary = computeReviewSummary(
       store.reviews,
@@ -543,6 +559,7 @@ async function startServer(): Promise<void> {
       apt.status = body.status;
     }
     saveStore(store);
+    void mirrorToFirebaseRtdb(`appointments/${apt.id}`, 'PUT', apt);
     res.json({ appointment: apt });
   });
 
@@ -562,6 +579,7 @@ async function startServer(): Promise<void> {
     if (typeof body.featured === 'boolean') review.featured = body.featured;
     if (typeof body.ownerReply === 'string') review.ownerReply = body.ownerReply.trim() || undefined;
     saveStore(store);
+    void mirrorToFirebaseRtdb(`reviews/${review.id}`, 'PUT', review);
     res.json({ review });
   });
 
@@ -574,6 +592,7 @@ async function startServer(): Promise<void> {
       return;
     }
     saveStore(store);
+    void mirrorToFirebaseRtdb(`reviews/${req.params.id}`, 'DELETE');
     res.json({ ok: true });
   });
 
@@ -604,6 +623,7 @@ async function startServer(): Promise<void> {
           : prev.baseDirectoryReviewCount,
     };
     saveStore(store);
+    void mirrorToFirebaseRtdb('site/shopDetails', 'PUT', store.shopDetails);
     res.json({ shopDetails: store.shopDetails });
   });
 
@@ -696,6 +716,7 @@ async function startServer(): Promise<void> {
       estimatorAddons,
     };
     saveStore(store);
+    void mirrorToFirebaseRtdb('site/catalog', 'PUT', store.catalog);
     res.json({ catalog: store.catalog });
   });
 

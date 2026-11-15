@@ -97,17 +97,24 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
     >
       <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200 shadow-xl p-6 sm:p-8 space-y-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800">
-              <Lock className="w-3.5 h-3.5" />
-              <span>Protected Workshop &amp; Billing Access</span>
+          <div className="flex items-start gap-3">
+            <img
+              src="/assets/aistudio/1794735885525_5eb76f5f.png"
+              alt="Deeksha Ladies Tailors & Matching Center logo"
+              className="h-12 w-12 object-contain rounded-xl border border-stone-200 bg-[#FAF8F6] shrink-0 mt-0.5"
+            />
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800">
+                <Lock className="w-3.5 h-3.5" />
+                <span>Protected Workshop &amp; Billing Access</span>
+              </div>
+              <h2 id="admin-login-title" className="font-display text-2xl font-semibold text-stone-950">
+                Admin Login
+              </h2>
+              <p className="text-xs text-stone-600">
+                Sign in with your Admin mobile number or email ID to unlock billing, measurements, AI bill scanner, accounts, and staff management.
+              </p>
             </div>
-            <h2 id="admin-login-title" className="font-display text-2xl font-semibold text-stone-950">
-              Admin Login
-            </h2>
-            <p className="text-xs text-stone-600">
-              Sign in with your Admin mobile number or email ID to unlock billing, measurements, AI bill scanner, accounts, and staff management.
-            </p>
           </div>
           <button
             type="button"

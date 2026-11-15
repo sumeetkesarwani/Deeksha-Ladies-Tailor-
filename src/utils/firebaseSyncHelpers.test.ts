@@ -5,6 +5,7 @@ import {
   extractRtdbRecords,
   filterCustomerPublicOrders,
   formatAdminLoginEmail,
+  mergeReviewsWithCloud,
   sanitizeRtdbKey,
 } from './firebaseSyncHelpers.ts';
 
@@ -122,4 +123,52 @@ test('extractRtdbRecords and sanitizeRtdbKey normalize RTDB structures safely', 
   assert.equal(extractRtdbRecords([{ id: '1' }, null]).length, 1);
   assert.equal(extractRtdbRecords({ a: { id: '1' }, b: { id: '2' } }).length, 2);
   assert.equal(sanitizeRtdbKey('2026-11-15/stf.1#a'), '2026-11-15_stf_1_a');
+});
+
+test('mergeReviewsWithCloud keeps baseline reviews when uninitialized and uses cloud authority when initialized', () => {
+  const baseline = [
+    {
+      id: 'rev-1',
+      customerName: 'Srabani Roy',
+      rating: 5,
+      service: 'Designer Blouse',
+      comment: 'Great fitting!',
+      source: 'Google Business Profile' as const,
+      visitDate: 'Oct 2026',
+      visible: true,
+      featured: true,
+      createdAt: '2026-10-24T12:00:00.000Z',
+    },
+  ];
+  const cloudNew = {
+    id: 'rev-999',
+    customerName: 'Ananya',
+    rating: 5,
+    service: 'Prince Cut Blouse',
+    comment: 'Loved the piping finish.',
+    source: 'Website Customer',
+    visitDate: 'Nov 2026',
+    visible: true,
+    featured: false,
+    createdAt: '2026-11-15T01:00:00.000Z',
+  };
+
+  // Uninitialized cloud preserves baseline + adds new cloud review sorted newest first
+  const merged = mergeReviewsWithCloud({
+    cloudReviews: [cloudNew],
+    baselineReviews: baseline,
+    reviewsInitialized: false,
+  });
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].id, 'rev-999');
+  assert.equal(merged[1].id, 'rev-1');
+
+  // Initialized cloud respects deletions of baseline items
+  const authoritative = mergeReviewsWithCloud({
+    cloudReviews: [cloudNew],
+    baselineReviews: baseline,
+    reviewsInitialized: true,
+  });
+  assert.equal(authoritative.length, 1);
+  assert.equal(authoritative[0].id, 'rev-999');
 });

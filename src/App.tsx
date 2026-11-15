@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { firebaseAuth } from './firebase.ts';
 import type {
@@ -6,10 +6,10 @@ import type {
   CatalogConfig,
   CustomerReview,
   PublicBootstrapPayload,
-  ReviewSummary,
   ShopDetails,
 } from './types.ts';
-import { DEFAULT_CATALOG } from './utils/tailoring.ts';
+import { DEFAULT_CATALOG, computeReviewSummary } from './utils/tailoring.ts';
+import { subscribePublicStorefrontRtdb } from './utils/firebaseRtdb.ts';
 import { Navbar } from './components/Navbar.tsx';
 import { HeroSection } from './components/HeroSection.tsx';
 import { ServicesAndCatalog } from './components/ServicesAndCatalog.tsx';
@@ -39,18 +39,67 @@ const FALLBACK_SHOP: ShopDetails = {
   baseDirectoryReviewCount: 35,
 };
 
-const FALLBACK_SUMMARY: ReviewSummary = {
-  averageRating: 4.8,
-  totalReviewsCount: 35,
-  googleProfileUrl: 'https://share.google/zbgBH15WaKYkn3CG8',
-  sourceNote: 'Verified rating across Google Business Profile & local Kolkata directories',
-};
+const FALLBACK_REVIEWS: CustomerReview[] = [
+  {
+    id: 'rev-1',
+    customerName: 'Srabani Roy',
+    rating: 5,
+    service: 'Designer Blouse & Matching Astar',
+    comment:
+      'Accurate shoulder and bust fitting without needing repeated alterations. Having matching cotton astar and falls right at the shop saves so much time in Rajarhat.',
+    source: 'Google Business Profile',
+    visitDate: 'October 2026',
+    visible: true,
+    featured: true,
+    ownerReply: 'Thank you for trusting us with your festive sarees, Srabani ji.',
+    createdAt: '2026-10-24T12:00:00.000Z',
+  },
+  {
+    id: 'rev-2',
+    customerName: 'Paramita Bose',
+    rating: 5,
+    service: 'Bridal Blouse & Saree Finishing',
+    comment:
+      'Cooperative staff and reliable delivery dates even during Durga Puja rush. My padded Prince cut blouses turned out neat with zero puckering.',
+    source: 'Justdial Verified',
+    visitDate: 'October 2026',
+    visible: true,
+    featured: true,
+    createdAt: '2026-10-12T15:30:00.000Z',
+  },
+  {
+    id: 'rev-3',
+    customerName: 'Nandini Chakraborty',
+    rating: 5,
+    service: 'Salwar Suit & Alia Cut Kurti',
+    comment:
+      'Very convenient location right opposite Bazaar Kolkata near Rajarhat Thana. Clean finishing on Pakistani suit mori and palazzo trousers.',
+    source: 'Google Business Profile',
+    visitDate: 'September 2026',
+    visible: true,
+    featured: false,
+    createdAt: '2026-09-28T11:20:00.000Z',
+  },
+  {
+    id: 'rev-4',
+    customerName: 'Tania Mondal',
+    rating: 4,
+    service: 'Urgent 24-Hour Blouse Stitching',
+    comment:
+      'Needed an urgent blouse stitched before a wedding in New Town. Delivered on time with matching dori and handmade tassels.',
+    source: 'Justdial Verified',
+    visitDate: 'September 2026',
+    visible: true,
+    featured: false,
+    createdAt: '2026-09-14T18:10:00.000Z',
+  },
+];
 
 export default function App() {
   const [shopDetails, setShopDetails] = useState<ShopDetails>(FALLBACK_SHOP);
   const [catalog, setCatalog] = useState<CatalogConfig>(DEFAULT_CATALOG);
-  const [reviews, setReviews] = useState<CustomerReview[]>([]);
-  const [reviewSummary, setReviewSummary] = useState<ReviewSummary>(FALLBACK_SUMMARY);
+  const [reviews, setReviews] = useState<CustomerReview[]>(FALLBACK_REVIEWS);
+  const baselineReviewsRef = useRef<CustomerReview[]>(FALLBACK_REVIEWS);
 
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authToken, setAuthToken] = useState<string>(() => {
@@ -63,6 +112,17 @@ export default function App() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [activeView, setActiveView] = useState<'public' | 'dashboard'>('public');
 
+  const reviewSummary = useMemo(
+    () =>
+      computeReviewSummary(
+        reviews,
+        shopDetails.baseDirectoryRating,
+        shopDetails.baseDirectoryReviewCount,
+        shopDetails.googleBusinessUrl,
+      ),
+    [reviews, shopDetails],
+  );
+
   useEffect(() => {
     const loadPublic = async () => {
       try {
@@ -73,8 +133,17 @@ export default function App() {
         if (data.catalog) {
           setCatalog(data.catalog);
         }
-        setReviews(data.reviews);
-        setReviewSummary(data.reviewSummary);
+        if (Array.isArray(data.reviews) && data.reviews.length > 0) {
+          baselineReviewsRef.current = data.reviews;
+          setReviews((prev) => {
+            const byId = new Map<string, CustomerReview>();
+            data.reviews.forEach((r) => byId.set(r.id, r));
+            prev.forEach((r) => {
+              if (!byId.has(r.id)) byId.set(r.id, r);
+            });
+            return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          });
+        }
       } catch {
         // Keep fallback shop details if offline
       }
@@ -82,7 +151,20 @@ export default function App() {
 
     void loadPublic();
 
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (fbUser) => {
+    const unsubStorefront = subscribePublicStorefrontRtdb({
+      getBaselineReviews: () => baselineReviewsRef.current,
+      onReviewsUpdate: (mergedReviews) => {
+        setReviews(mergedReviews);
+      },
+      onShopDetailsUpdate: (cloudShop) => {
+        setShopDetails(cloudShop);
+      },
+      onCatalogUpdate: (cloudCatalog) => {
+        setCatalog(cloudCatalog);
+      },
+    });
+
+    const unsubscribeAuth = onAuthStateChanged(firebaseAuth, async (fbUser) => {
       if (!fbUser) {
         try {
           localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -128,7 +210,8 @@ export default function App() {
     });
 
     return () => {
-      unsubscribe();
+      unsubStorefront();
+      unsubscribeAuth();
     };
   }, []);
 
@@ -167,9 +250,8 @@ export default function App() {
     setActiveView('public');
   };
 
-  const handleReviewAdded = (review: CustomerReview, summary: ReviewSummary) => {
-    setReviews((prev) => [review, ...prev]);
-    setReviewSummary(summary);
+  const handleReviewAdded = (review: CustomerReview) => {
+    setReviews((prev) => [review, ...prev.filter((r) => r.id !== review.id)]);
   };
 
   return (
@@ -186,12 +268,14 @@ export default function App() {
         <BusinessDashboard
           authUser={authUser}
           authToken={authToken}
+          initialShopDetails={shopDetails}
+          initialCatalog={catalog}
+          initialReviews={reviews}
           onLogout={() => void handleLogout()}
           onShopUpdated={setShopDetails}
           onCatalogUpdated={setCatalog}
-          onReviewsUpdated={(nextReviews, nextSummary) => {
+          onReviewsUpdated={(nextReviews) => {
             setReviews(nextReviews);
-            setReviewSummary(nextSummary);
           }}
         />
       ) : (
@@ -217,11 +301,18 @@ export default function App() {
 
       <footer className="bg-stone-950 text-stone-400 py-10 border-t border-stone-800 text-xs">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <p className="font-display text-base font-semibold text-white">{shopDetails.businessName}</p>
-            <p>
-              {shopDetails.address}, {shopDetails.city} – {shopDetails.pincode}
-            </p>
+          <div className="flex items-center gap-3.5">
+            <img
+              src="/assets/aistudio/1794735885525_5eb76f5f.png"
+              alt="Deeksha Ladies Tailors & Matching Center logo"
+              className="w-12 h-12 object-contain rounded-xl bg-white p-1 shrink-0"
+            />
+            <div className="space-y-1">
+              <p className="font-display text-base font-semibold text-white">{shopDetails.businessName}</p>
+              <p>
+                {shopDetails.address}, {shopDetails.city} – {shopDetails.pincode}
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-5">
