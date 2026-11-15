@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Deeksha Ladies Tailors & Matching Center | Rajarhat, Kolkata</title>
+  <meta name="description" content="Bespoke ladies tailoring, designer blouse stitching, bridal lehengas, salwar suits, and complete matching center fabric in Rajarhat, Kolkata." />
+  <meta name="theme-color" content="#be185d" />
+
+  <!-- Google Fonts & Tailwind CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #faf5f8;
+      color: #1e293b;
+      scroll-behavior: smooth;
+    }
+    .font-serif {
+      font-family: 'Playfair Display', serif;
+    }
+    .glow-effect {
+      box-shadow: 0 10px 30px -10px rgba(219, 39, 119, 0.3);
+    }
+    /* Hide scrollbars cleanly */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="antialiased min-h-screen text-slate-800 selection:bg-pink-200 selection:text-pink-900 pb-16">
+
+  <!-- Top Announcement Bar -->
+  <div class="bg-gradient-to-r from-pink-800 via-rose-700 to-pink-900 text-pink-100 text-[11px] sm:text-xs py-1.5 px-4 text-center font-semibold tracking-wide flex items-center justify-center gap-2">
+    <span>✨ Express 24-Hour Stitching Available for Urgent Occasions</span>
+    <span class="opacity-40">•</span>
+    <a href="tel:917449531663" class="underline hover:text-white font-bold">Call: +91 74495 31663</a>
+  </div>
+
+  <!-- Main Navigation Header -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-pink-100 shadow-sm transition">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="#" class="flex items-center space-x-2.5">
+        <span class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-600 to-rose-500 text-white flex items-center justify-center font-black text-xl shadow-md shadow-pink-200">🪡</span>
+        <div>
+          <span class="text-sm sm:text-base font-black tracking-tight uppercase text-slate-900 block leading-none">Deeksha</span>
+          <span class="text-[10px] sm:text-[11px] font-bold text-pink-700 tracking-wider uppercase">Ladies Tailors &amp; Matching Center</span>
+        </div>
+      </a>
+      
+      <div class="hidden md:flex items-center space-x-6 text-xs font-bold text-slate-600">
+        <a href="#about" class="hover:text-pink-600 transition">Our Craft</a>
+        <a href="#services" class="hover:text-pink-600 transition">Tailoring Services</a>
+        <a href="#fabric-guide" class="hover:text-pink-600 transition">Matching Center</a>
+        <a href="#lookbook" class="hover:text-pink-600 transition">Design Catalog</a>
+        <a href="#estimator" class="hover:text-pink-600 transition">Cost Estimator</a>
+        <a href="#track-order" class="text-pink-700 font-black hover:text-pink-800 transition flex items-center gap-1">
+          <span>🔍</span> Track Order
+        </a>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <a href="https://api.whatsapp.com/send?phone=917449531663&text=Hello%20Deeksha%20Tailors,%20I%20would%20like%20to%20inquire%20about%20stitching." target="_blank" class="p-2 sm:px-3 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition active:scale-95 flex items-center gap-1.5 shadow-sm">
+          <span>💬</span> <span class="hidden sm:inline">WhatsApp</span>
+        </a>
+        <a href="#appointment" class="px-3.5 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-xl text-xs font-black shadow-md shadow-pink-200 hover:from-pink-700 hover:to-rose-700 transition active:scale-95 flex items-center gap-1">
+          <span>📅</span> <span>Book Fitting</span>
+        </a>
+        <button onclick="toggleMobileNav()" class="md:hidden p-2 text-slate-700 hover:bg-pink-50 rounded-xl">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer -->
+    <div id="mobile-nav" class="hidden md:hidden bg-white border-b border-pink-100 px-4 py-3 space-y-2 text-xs font-bold text-slate-700">
+      <a href="#about" onclick="toggleMobileNav()" class="block py-1.5 hover:text-pink-600">Our Craft &amp; Story</a>
+      <a href="#services" onclick="toggleMobileNav()" class="block py-1.5 hover:text-pink-600">Tailoring Services</a>
+      <a href="#fabric-guide" onclick="toggleMobileNav()" class="block py-1.5 hover:text-pink-600">Matching Center &amp; Astar</a>
+      <a href="#lookbook" onclick="toggleMobileNav()" class="block py-1.5 hover:text-pink-600">Design Catalog</a>
+      <a href="#estimator" onclick="toggleMobileNav()" class="block py-1.5 hover:text-pink-600">Cost Estimator</a>
+      <a href="#track-order" onclick="toggleMobileNav()" class="block py-1.5 text-pink-700 font-black">🔍 Track Your Order</a>
+      <a href="#appointment" onclick="toggleMobileNav()" class="block py-1.5 text-rose-600">Book Measurement Visit</a>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       HERO SECTION WITH ORDER LOOKUP
+       ======================================================== -->
+  <section class="relative overflow-hidden pt-8 pb-12 sm:pt-16 sm:pb-20 bg-gradient-to-b from-white via-pink-50/50 to-slate-50 border-b border-pink-100/60">
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      
+      <!-- Left Hero Text -->
+      <div class="lg:col-span-7 space-y-5 text-center lg:text-left">
+        <div class="inline-flex items-center gap-2 bg-pink-100/80 border border-pink-300 text-pink-800 text-xs font-black px-3.5 py-1.5 rounded-full">
+          <span>📍 Rajarhat, Kolkata</span>
+          <span class="opacity-40">•</span>
+          <span>Opposite Bazaar Kolkata</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
+          Perfect Fitting. <br>
+          <span class="font-serif italic font-normal text-pink-600">Designer Elegance</span> in Every Stitch.
+        </h1>
+
+        <p class="text-sm sm:text-base text-slate-600 max-w-xl mx-auto lg:mx-0 font-medium leading-relaxed">
+          From signature <b>Alite Cut</b>, <b>Prince Cut</b> &amp; <b>Sabyasachi bridal blouses</b> to contemporary Salwar Suits and premium matching fabrics. Kolkata’s trusted boutique ladies' tailoring destination.
+        </p>
+
+        <div class="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-2">
+          <a href="#appointment" class="px-6 py-3 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-pink-200 transition active:scale-95 flex items-center gap-2">
+            <span>📅 Book Measurement Visit</span>
+          </a>
+          <a href="#estimator" class="px-5 py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-md transition active:scale-95 flex items-center gap-1.5">
+            <span>🧮 Cost Estimator</span>
+          </a>
+          <a href="https://api.whatsapp.com/send?phone=917449531663" target="_blank" class="px-5 py-3 bg-white hover:bg-pink-50 text-slate-800 font-bold text-xs sm:text-sm rounded-2xl border border-pink-200 shadow-sm transition active:scale-95 flex items-center gap-2">
+            <span>💬 Chat on WhatsApp</span>
+          </a>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="pt-4 grid grid-cols-3 gap-2 border-t border-pink-200/60 max-w-lg mx-auto lg:mx-0 text-left">
+          <div class="bg-white/80 p-2.5 rounded-xl border border-pink-100">
+            <span class="block text-base sm:text-lg font-black text-pink-700">100%</span>
+            <span class="text-[10px] text-slate-500 font-bold uppercase">Fitting Guarantee</span>
+          </div>
+          <div class="bg-white/80 p-2.5 rounded-xl border border-pink-100">
+            <span class="block text-base sm:text-lg font-black text-indigo-700">24-48 Hrs</span>
+            <span class="text-[10px] text-slate-500 font-bold uppercase">Express Delivery</span>
+          </div>
+          <div class="bg-white/80 p-2.5 rounded-xl border border-pink-100">
+            <span class="block text-base sm:text-lg font-black text-emerald-700">1-Stop</span>
+            <span class="text-[10px] text-slate-500 font-bold uppercase">Matching Center</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Hero Card: Quick Order Status & Delivery Lookup -->
+      <div class="lg:col-span-5">
+        <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-xl border border-pink-100 space-y-4 glow-effect">
+          <div class="flex items-center justify-between pb-3 border-b border-pink-100">
+            <div class="flex items-center space-x-2">
+              <span class="w-8 h-8 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center text-base font-black">🔍</span>
+              <div>
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-tight">Track Your Tailoring Order</h3>
+                <p class="text-[10px] text-slate-500 font-medium">Check whether your clothes are ready for pickup</p>
+              </div>
+            </div>
+            <span class="text-[10px] bg-emerald-50 text-emerald-700 font-black px-2 py-0.5 rounded-full border border-emerald-200">
+              Live Status
+            </span>
+          </div>
+
+          <div class="space-y-2">
+            <label class="block text-[11px] font-bold text-slate-600 uppercase">Enter 10-Digit Mobile or Bill No.</label>
+            <div class="relative">
+              <input 
+                id="hero-track-input" 
+                type="text" 
+                placeholder="e.g. 9831200000 or 101" 
+                class="w-full px-3.5 py-2.5 pl-9 border-2 border-pink-100 focus:border-pink-500 rounded-xl text-xs sm:text-sm font-bold text-slate-800 outline-none" 
+                onkeydown="if(event.key === 'Enter') trackCustomerOrder('hero')"
+              />
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">📱</span>
+            </div>
+          </div>
+
+          <button onclick="trackCustomerOrder('hero')" class="w-full py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5">
+            <span>🔎</span> <span>Check Readiness &amp; Pickup</span>
+          </button>
+
+          <!-- Search Results Container -->
+          <div id="hero-track-results" class="hidden pt-2 space-y-2.5 border-t border-slate-100"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================
+       SECTION: OUR SPECIALIZED TAILORING SERVICES
+       ======================================================== -->
+  <section id="services" class="py-12 sm:py-16 max-w-6xl mx-auto px-4 space-y-8">
+    <div class="text-center max-w-2xl mx-auto space-y-2">
+      <span class="text-xs font-black uppercase tracking-widest text-pink-700">Master Craftsmanship</span>
+      <h2 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
+        Tailoring Services Tailored to You
+      </h2>
+      <p class="text-xs sm:text-sm text-slate-600 font-medium">
+        Every seam is shaped for body-flattering grace, seam comfort, and long-lasting durability.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Card 1: Blouse -->
+      <div class="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm hover:shadow-md transition space-y-3 flex flex-col justify-between">
+        <div class="space-y-2">
+          <div class="w-10 h-10 rounded-2xl bg-pink-100 text-pink-700 flex items-center justify-center text-xl font-bold">✂️</div>
+          <h3 class="text-base font-black text-slate-900">Designer Blouses</h3>
+          <p class="text-xs text-slate-600 leading-relaxed font-medium">
+            Signature Alite cut, Prince cut (padded/non-padded), Katori, Bombay cut, Sabyasachi bridal cuts &amp; backless dori styling.
+          </p>
+        </div>
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-500">Starting from</span>
+          <span class="font-black text-pink-700 text-sm">₹350</span>
+        </div>
+      </div>
+
+      <!-- Card 2: Salwar Suit & Kurti -->
+      <div class="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm hover:shadow-md transition space-y-3 flex flex-col justify-between">
+        <div class="space-y-2">
+          <div class="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl font-bold">👗</div>
+          <h3 class="text-base font-black text-slate-900">Salwar Suits &amp; Kurtis</h3>
+          <p class="text-xs text-slate-600 leading-relaxed font-medium">
+            Straight cut, Nayra cut, Alia cut V-Empire, Anarkali flared, Pakistani suits with designer mori, cigarette pants &amp; palazzos.
+          </p>
+        </div>
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-500">Starting from</span>
+          <span class="font-black text-purple-700 text-sm">₹350</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Bridal Lehengas & Gowns -->
+      <div class="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm hover:shadow-md transition space-y-3 flex flex-col justify-between">
+        <div class="space-y-2">
+          <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl font-bold">👑</div>
+          <h3 class="text-base font-black text-slate-900">Bridal &amp; Lehengas</h3>
+          <p class="text-xs text-slate-600 leading-relaxed font-medium">
+            Heavy zari bridal lehenga choli tailoring, kalidar stitching, cancan net insertion, dupatta setting &amp; festive western gowns.
+          </p>
+        </div>
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-500">Starting from</span>
+          <span class="font-black text-amber-700 text-sm">₹1,200</span>
+        </div>
+      </div>
+
+      <!-- Card 4: Finishing & Alterations -->
+      <div class="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm hover:shadow-md transition space-y-3 flex flex-col justify-between">
+        <div class="space-y-2">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl font-bold">🪡</div>
+          <h3 class="text-base font-black text-slate-900">Fall, Pico &amp; Tassels</h3>
+          <p class="text-xs text-slate-600 leading-relaxed font-medium">
+            Fine saree fall stitching, zig-zag interlock pico, saree kuchu thread tassels, hand latkans &amp; quick precision alterations.
+          </p>
+        </div>
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-500">Starting from</span>
+          <span class="font-black text-emerald-700 text-sm">₹60</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================
+       SECTION: MATCHING CENTER & FABRIC PRICE GUIDE
+       ======================================================== -->
+  <section id="fabric-guide" class="py-12 bg-white border-y border-pink-100">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-gradient-to-br from-pink-900 via-rose-900 to-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        
+        <div class="lg:col-span-5 space-y-4">
+          <span class="text-pink-300 text-xs font-bold uppercase tracking-widest block">Matching Center Spotlight</span>
+          <h2 class="text-2xl sm:text-3xl font-black tracking-tight leading-snug">
+            All Your Linings, Astors &amp; Accessories Under One Roof
+          </h2>
+          <p class="text-xs sm:text-sm text-pink-100/80 leading-relaxed font-medium">
+            Never run around Kolkata searching for a color match. We stock 100+ shades of pure cotton astar, crepe linings, heavy falls, borders, and bridal accessories right across from Bazaar Kolkata.
+          </p>
+          <div class="pt-2">
+            <a href="https://api.whatsapp.com/send?phone=917449531663&text=Hi%20Deeksha%20Tailors,%20I%20have%20a%20saree%20and%20want%20to%20check%20if%20matching%20lining/fall%20is%20available." target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95">
+              <span>💬 Send Saree Photo to Match Fabric</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="lg:col-span-7 bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 space-y-2.5 text-xs">
+          <div class="flex items-center justify-between pb-2 border-b border-white/20 font-black text-pink-200 uppercase text-[11px]">
+            <span>Matching Fabric &amp; Accessory</span>
+            <span>Approx. Rate</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1.5 border-b border-white/10">
+            <div>
+              <span class="font-bold text-white block">Premium Rubia Cotton Astar (per meter)</span>
+              <span class="text-[10px] text-pink-200">100% pre-shrunk colorfast cotton</span>
+            </div>
+            <span class="font-black text-amber-300 text-sm">₹45 – ₹65</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1.5 border-b border-white/10">
+            <div>
+              <span class="font-bold text-white block">Santoon / Butter Crepe Lining (per meter)</span>
+              <span class="text-[10px] text-pink-200">Soft silky feel for designer suits &amp; kurtis</span>
+            </div>
+            <span class="font-black text-amber-300 text-sm">₹60 – ₹80</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1.5 border-b border-white/10">
+            <div>
+              <span class="font-bold text-white block">Standard Cotton Saree Fall (Piece)</span>
+              <span class="text-[10px] text-pink-200">Pre-washed, anti-shrink border weight</span>
+            </div>
+            <span class="font-black text-amber-300 text-sm">₹30 – ₹45</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1.5 border-b border-white/10">
+            <div>
+              <span class="font-bold text-white block">Fancy Heavy Bridal Latkan (Pair)</span>
+              <span class="text-[10px] text-pink-200">Handmade thread tassels, mirror tassels &amp; pearls</span>
+            </div>
+            <span class="font-black text-amber-300 text-sm">₹80 – ₹250</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1.5 border-b border-white/10">
+            <div>
+              <span class="font-bold text-white block">Gota Patti &amp; Cutwork Border (per meter)</span>
+              <span class="text-[10px] text-pink-200">Gold, silver, zari and thread laces</span>
+            </div>
+            <span class="font-black text-amber-300 text-sm">₹35 – ₹120</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1.5">
+            <div>
+              <span class="font-bold text-white block">Pure Cotton Standard Inskirt / Petticoat</span>
+              <span class="text-[10px] text-pink-200">Cotton petticoats, satin inskirts &amp; mermaid cuts</span>
+            </div>
+            <span class="font-black text-amber-300 text-sm">₹160 – ₹240</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       SECTION: INTERACTIVE COST ESTIMATOR
+       ======================================================== -->
+  <section id="estimator" class="py-12 sm:py-16 max-w-4xl mx-auto px-4">
+    <div class="text-center space-y-2 mb-8">
+      <span class="text-xs font-black uppercase tracking-widest text-pink-700">Fair &amp; Transparent</span>
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+        Instant Stitching Cost Estimator
+      </h2>
+      <p class="text-xs sm:text-sm text-slate-600 font-medium">
+        Calculate estimated tailoring charges and add-ons before visiting our counter.
+      </p>
+    </div>
+
+    <div class="bg-white rounded-3xl p-5 sm:p-8 border border-pink-100 shadow-xl space-y-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">1. Select Garment Type</label>
+          <select id="est-garment" onchange="calculateWebsiteEstimate()" class="w-full px-3 py-2.5 border-2 border-slate-200 focus:border-pink-500 rounded-xl text-xs sm:text-sm font-bold text-slate-800 outline-none">
+            <option value="350" data-name="Alite Cut Designer Blouse" selected>✂️ Alite Cut Designer Blouse - ₹350</option>
+            <option value="320" data-name="Prince Cut Blouse">✂️ Prince Cut Blouse - ₹320</option>
+            <option value="420" data-name="Katori / Double Katori Blouse">✂️ Katori / Double Katori Blouse - ₹420</option>
+            <option value="450" data-name="Sabyasachi / Bridal Cut Blouse">✂️ Sabyasachi / Bridal Cut Blouse - ₹450</option>
+            <option value="350" data-name="Simple Straight Kurti / Top">👗 Simple Straight Kurti / Top - ₹350</option>
+            <option value="550" data-name="Full Salwar Suit Set (Top + Bottom)">👗 Full Salwar Suit Set (Top + Bottom) - ₹550</option>
+            <option value="750" data-name="Anarkali / Alia / Nayra Cut Suit">👗 Anarkali / Alia / Nayra Cut Suit - ₹750</option>
+            <option value="1200" data-name="Lehenga Choli Stitching">👑 Lehenga Choli Stitching - ₹1,200</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">2. Turnaround Speed</label>
+          <select id="est-speed" onchange="calculateWebsiteEstimate()" class="w-full px-3 py-2.5 border-2 border-slate-200 focus:border-pink-500 rounded-xl text-xs sm:text-sm font-bold text-slate-800 outline-none">
+            <option value="0" data-name="Standard Delivery (4 to 6 Days)" selected>Standard Delivery (4 to 6 Days) - Regular</option>
+            <option value="150" data-name="Express Rush Delivery (24 to 48 Hours)">Express Rush Delivery (24 to 48 Hours) - +₹150</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Add-ons Checkboxes -->
+      <div class="space-y-2 pt-2 border-t border-slate-100">
+        <label class="block text-xs font-bold text-slate-700 uppercase">3. Design Add-Ons &amp; Linings</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+          <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-pink-50/50 transition">
+            <input type="checkbox" id="est-addon-cups" value="120" onchange="calculateWebsiteEstimate()" class="w-4 h-4 text-pink-600 rounded border-slate-300 focus:ring-pink-500 accent-pink-600">
+            <span class="font-bold text-slate-800">Padded Cups (+₹120)</span>
+          </label>
+          <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-pink-50/50 transition">
+            <input type="checkbox" id="est-addon-lining" value="80" onchange="calculateWebsiteEstimate()" class="w-4 h-4 text-pink-600 rounded border-slate-300 focus:ring-pink-500 accent-pink-600">
+            <span class="font-bold text-slate-800">Double / Cotton Lining (+₹80)</span>
+          </label>
+          <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-pink-50/50 transition">
+            <input type="checkbox" id="est-addon-piping" value="60" onchange="calculateWebsiteEstimate()" class="w-4 h-4 text-pink-600 rounded border-slate-300 focus:ring-pink-500 accent-pink-600">
+            <span class="font-bold text-slate-800">Contrast Thread Piping (+₹60)</span>
+          </label>
+          <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-pink-50/50 transition">
+            <input type="checkbox" id="est-addon-dori" value="80" onchange="calculateWebsiteEstimate()" class="w-4 h-4 text-pink-600 rounded border-slate-300 focus:ring-pink-500 accent-pink-600">
+            <span class="font-bold text-slate-800">Dori + Latkan Set (+₹80)</span>
+          </label>
+          <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-pink-50/50 transition">
+            <input type="checkbox" id="est-addon-fall" value="60" onchange="calculateWebsiteEstimate()" class="w-4 h-4 text-pink-600 rounded border-slate-300 focus:ring-pink-500 accent-pink-600">
+            <span class="font-bold text-slate-800">Saree Fall + Pico (+₹60)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Result Card -->
+      <div class="bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 p-4 sm:p-5 rounded-2xl border border-pink-200 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span class="text-[10px] font-black uppercase text-pink-700 tracking-wider block">Estimated Charges</span>
+          <div class="text-xs text-slate-600 mt-0.5" id="est-summary-text">
+            Alite Cut Designer Blouse • Standard Delivery
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-2xl sm:text-3xl font-black text-pink-800" id="est-total-amount">₹350</span>
+          <span class="text-[10px] text-slate-400 block font-medium">Excluding fabric cost</span>
+        </div>
+      </div>
+
+      <div class="text-center pt-2">
+        <a id="est-whatsapp-btn" href="https://api.whatsapp.com/send?phone=917449531663" target="_blank" class="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow transition active:scale-95">
+          <span>💬 Book This Stitching on WhatsApp</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       SECTION: DESIGN LOOKBOOK & CATALOG
+       ======================================================== -->
+  <section id="lookbook" class="py-12 sm:py-16 bg-slate-100/60 border-t border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 space-y-8">
+      <div class="text-center max-w-2xl mx-auto space-y-2">
+        <span class="text-xs font-black uppercase tracking-widest text-pink-700">Design Catalog</span>
+        <h2 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
+          Trending Cuts &amp; Neck Patterns
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-600 font-medium">
+          Choose a pattern or bring your Pinterest / Instagram reference photo.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="bg-white p-3 rounded-2xl border border-pink-100 text-center space-y-2 shadow-sm hover:shadow-md transition">
+          <div class="h-20 bg-pink-50 rounded-xl flex items-center justify-center text-3xl">👗</div>
+          <h4 class="text-xs font-black text-slate-800">Alite Cut</h4>
+          <p class="text-[10px] text-slate-500">Perfect bust darting &amp; tailored fit</p>
+        </div>
+        <div class="bg-white p-3 rounded-2xl border border-pink-100 text-center space-y-2 shadow-sm hover:shadow-md transition">
+          <div class="h-20 bg-purple-50 rounded-xl flex items-center justify-center text-3xl">✂️</div>
+          <h4 class="text-xs font-black text-slate-800">Prince Cut</h4>
+          <p class="text-[10px] text-slate-500">Seamless curve, padded support</p>
+        </div>
+        <div class="bg-white p-3 rounded-2xl border border-pink-100 text-center space-y-2 shadow-sm hover:shadow-md transition">
+          <div class="h-20 bg-rose-50 rounded-xl flex items-center justify-center text-3xl">✨</div>
+          <h4 class="text-xs font-black text-slate-800">Sweetheart Neck</h4>
+          <p class="text-[10px] text-slate-500">Deep romantic neckline styling</p>
+        </div>
+        <div class="bg-white p-3 rounded-2xl border border-pink-100 text-center space-y-2 shadow-sm hover:shadow-md transition">
+          <div class="h-20 bg-indigo-50 rounded-xl flex items-center justify-center text-3xl">👑</div>
+          <h4 class="text-xs font-black text-slate-800">Sabyasachi Cut</h4>
+          <p class="text-[10px] text-slate-500">Deep broad V-neck with heavy dori</p>
+        </div>
+        <div class="bg-white p-3 rounded-2xl border border-pink-100 text-center space-y-2 shadow-sm hover:shadow-md transition">
+          <div class="h-20 bg-amber-50 rounded-xl flex items-center justify-center text-3xl">🎀</div>
+          <h4 class="text-xs font-black text-slate-800">Pot / Keyhole Back</h4>
+          <p class="text-[10px] text-slate-500">Drop shape with custom latkans</p>
+        </div>
+        <div class="bg-white p-3 rounded-2xl border border-pink-100 text-center space-y-2 shadow-sm hover:shadow-md transition">
+          <div class="h-20 bg-emerald-50 rounded-xl flex items-center justify-center text-3xl">🌸</div>
+          <h4 class="text-xs font-black text-slate-800">Alia Empire Kurti</h4>
+          <p class="text-[10px] text-slate-500">V-empire gathers for party wear</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       SECTION: DEDICATED ORDER TRACKING PORTAL
+       ======================================================== -->
+  <section id="track-order" class="py-12 sm:py-16 max-w-4xl mx-auto px-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-10 border border-pink-100 shadow-xl space-y-6">
+      <div class="text-center space-y-2 max-w-xl mx-auto">
+        <span class="w-10 h-10 rounded-2xl bg-pink-100 text-pink-700 flex items-center justify-center mx-auto text-xl font-bold">📦</span>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Customer Order &amp; Delivery Tracker
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-600 font-medium">
+          Check if your blouse, suit, or saree is stitched, ready on the hanger, or ready for pickup.
+        </p>
+      </div>
+
+      <div class="max-w-md mx-auto space-y-3">
+        <div class="relative">
+          <input 
+            id="main-track-input" 
+            type="text" 
+            placeholder="Enter 10-digit mobile number or Bill No..." 
+            class="w-full px-4 py-3 pl-10 border-2 border-slate-200 focus:border-pink-500 rounded-2xl text-xs sm:text-sm font-bold text-slate-900 outline-none" 
+            onkeydown="if(event.key === 'Enter') trackCustomerOrder('main')"
+          />
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">🔍</span>
+        </div>
+        <button onclick="trackCustomerOrder('main')" class="w-full py-3 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2">
+          <span>Search Order Status</span> <span>➔</span>
+        </button>
+      </div>
+
+      <div id="main-track-results" class="hidden pt-4 space-y-3"></div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       SECTION: BOOK AN APPOINTMENT / FITTING VISIT
+       ======================================================== -->
+  <section id="appointment" class="py-12 sm:py-16 bg-gradient-to-b from-white to-pink-50/60 border-t border-pink-100">
+    <div class="max-w-3xl mx-auto px-4 space-y-6">
+      <div class="text-center space-y-2">
+        <span class="text-xs font-black uppercase tracking-widest text-pink-700">Skip the Queue</span>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Book a Measurement &amp; Fitting Slot
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-600 font-medium">
+          Choose a preferred time to drop off your fabric or take custom measurements.
+        </p>
+      </div>
+
+      <form onsubmit="handleAppointmentSubmit(event)" class="bg-white rounded-3xl p-5 sm:p-8 border border-pink-100 shadow-xl space-y-4 text-xs font-bold text-slate-700">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Your Full Name <span class="text-rose-500">*</span></label>
+            <input id="appt-name" required type="text" placeholder="e.g. Priya Sharma" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-pink-500 font-semibold" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">10-Digit Mobile Number <span class="text-rose-500">*</span></label>
+            <input id="appt-phone" required type="tel" maxlength="10" placeholder="e.g. 98312XXXXX" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-pink-500 font-semibold" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Preferred Date</label>
+            <input id="appt-date" type="date" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-pink-500 font-semibold" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Preferred Time Slot</label>
+            <select id="appt-time" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-pink-500 font-semibold">
+              <option value="Morning (11:00 AM - 1:00 PM)">Morning (11:00 AM - 1:00 PM)</option>
+              <option value="Afternoon (1:00 PM - 4:00 PM)">Afternoon (1:00 PM - 4:00 PM)</option>
+              <option value="Evening (5:00 PM - 8:30 PM)" selected>Evening (5:00 PM - 8:30 PM)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Garment &amp; Requirements</label>
+          <input id="appt-notes" type="text" placeholder="e.g. 2 Blouses (1 Prince cut, 1 Alite cut), need cotton astar" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-pink-500 font-semibold" />
+        </div>
+
+        <div class="pt-2">
+          <button type="submit" class="w-full py-3 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-black rounded-xl text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2">
+            <span>💬 Submit &amp; Open WhatsApp Confirmation</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       SECTION: LOCATION & VISIT DETAILS
+       ======================================================== -->
+  <section id="about" class="py-12 sm:py-16 max-w-6xl mx-auto px-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-10 border border-pink-100 shadow-md grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+      <div class="space-y-4">
+        <span class="text-xs font-black uppercase tracking-widest text-pink-700">Counter &amp; Workshop</span>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-snug">
+          Visit Us in Rajarhat, Kolkata
+        </h2>
+        
+        <div class="space-y-3 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
+          <div class="flex items-start gap-2.5">
+            <span class="text-lg">📍</span>
+            <div>
+              <b class="text-slate-900">Address:</b><br>
+              211 Road, Opposite Bazaar Kolkata, Rajarhat, Kolkata – 700135, West Bengal.
+            </div>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <span class="text-lg">🕒</span>
+            <div>
+              <b class="text-slate-900">Shop Timings:</b><br>
+              Monday to Sunday: 10:30 AM – 9:00 PM (Open all 7 days during wedding &amp; festive season).
+            </div>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <span class="text-lg">📞</span>
+            <div>
+              <b class="text-slate-900">Direct Phone / WhatsApp:</b><br>
+              <a href="tel:917449531663" class="text-pink-700 font-black hover:underline">+91 74495 31663</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2 flex flex-wrap gap-2">
+          <a href="https://maps.google.com/?q=211+Road,+Opposite+Bazaar+Kolkata,+Rajarhat,+Kolkata" target="_blank" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black shadow transition active:scale-95 flex items-center gap-1.5">
+            <span>🗺️</span> <span>Open in Google Maps</span>
+          </a>
+          <a href="tel:917449531663" class="px-4 py-2 bg-pink-100 hover:bg-pink-200 text-pink-800 rounded-xl text-xs font-black transition active:scale-95 flex items-center gap-1.5">
+            <span>📞</span> <span>Call Counter</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Shop Highlights -->
+      <div class="bg-pink-50/70 rounded-2xl p-6 border border-pink-200/80 space-y-4">
+        <h3 class="text-sm font-black uppercase text-pink-900 tracking-wider">Why Women Choose Deeksha:</h3>
+        <ul class="space-y-2.5 text-xs text-slate-700 font-semibold">
+          <li class="flex items-center gap-2">
+            <span class="text-pink-600 font-black">✔</span>
+            <span>16-Point anatomical body measurements taken by experienced masters.</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="text-pink-600 font-black">✔</span>
+            <span>Zero puckering guarantee on deep back necks &amp; padded prince cuts.</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="text-pink-600 font-black">✔</span>
+            <span>Complete matching center: Cotton astar, falls, doris, and laces.</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="text-pink-600 font-black">✔</span>
+            <span>Transparent WhatsApp slip delivery with itemized bill breakdown.</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       FOOTER
+       ======================================================== -->
+  <footer class="bg-slate-900 text-slate-400 py-10 border-t border-slate-800 text-xs">
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-3 gap-6 items-center text-center sm:text-left">
+      <div>
+        <h3 class="text-white font-black text-sm uppercase tracking-wider">Deeksha Ladies Tailors</h3>
+        <p class="text-[11px] text-slate-400 mt-1">Bespoke Boutique Tailoring &amp; Matching Center</p>
+        <p class="text-[11px] text-slate-500">211 Road, Opp. Bazaar Kolkata, Rajarhat, Kolkata 700135</p>
+      </div>
+
+      <div class="space-y-1 text-center">
+        <a href="#services" class="hover:text-white transition">Services</a> • 
+        <a href="#fabric-guide" class="hover:text-white transition">Matching Fabric</a> • 
+        <a href="#estimator" class="hover:text-white transition">Estimator</a> • 
+        <a href="#track-order" class="hover:text-white transition">Track Order</a>
+      </div>
+
+      <div class="text-center sm:text-right space-y-1">
+        <div class="text-white font-black">📞 +91 74495 31663</div>
+        <div class="text-[10px] text-slate-500">Open 7 Days • 10:30 AM to 9:00 PM</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Floating WhatsApp Concierge Button -->
+  <a href="https://api.whatsapp.com/send?phone=917449531663&text=Hello%20Deeksha%20Tailors,%20I%20have%20an%20inquiry%20regarding%20stitching." target="_blank" class="fixed bottom-4 right-4 z-40 bg-emerald-500 hover:bg-emerald-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-2xl transition hover:scale-110 active:scale-95" title="Chat on WhatsApp">
+    💬
+  </a>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 pointer-events-none transition-all duration-200 opacity-0 scale-95">
+    <span id="toast-icon">ℹ️</span>
+    <span id="toast-msg">Notification</span>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'deeksha_orders_registry_v1';
+
+    function toggleMobileNav() {
+      const el = document.getElementById('mobile-nav');
+      if (el) el.classList.toggle('hidden');
+    }
+
+    function showToast(msg, icon = 'ℹ️') {
+      const toast = document.getElementById('toast');
+      const msgEl = document.getElementById('toast-msg');
+      const iconEl = document.getElementById('toast-icon');
+      if (!toast) return;
+      msgEl.textContent = msg;
+      iconEl.textContent = icon;
+      toast.classList.remove('opacity-0', 'scale-95');
+      toast.classList.add('opacity-100', 'scale-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'scale-100');
+        toast.classList.add('opacity-0', 'scale-95');
+      }, 2500);
+    }
+
+    function calculateWebsiteEstimate() {
+      const garmentSel = document.getElementById('est-garment');
+      const speedSel = document.getElementById('est-speed');
+      if (!garmentSel || !speedSel) return;
+
+      const baseAmount = parseFloat(garmentSel.value) || 0;
+      const garmentName = garmentSel.options[garmentSel.selectedIndex].getAttribute('data-name') || 'Garment';
+      const speedFee = parseFloat(speedSel.value) || 0;
+      const speedName = speedSel.options[speedSel.selectedIndex].getAttribute('data-name') || '';
+
+      let addOnsTotal = 0;
+      const addOnNames = [];
+
+      ['cups', 'lining', 'piping', 'dori', 'fall'].forEach(id => {
+        const el = document.getElementById('est-addon-' + id);
+        if (el && el.checked) {
+          addOnsTotal += parseFloat(el.value) || 0;
+          if (id === 'cups') addOnNames.push('Padded Cups');
+          if (id === 'lining') addOnNames.push('Double Lining');
+          if (id === 'piping') addOnNames.push('Piping');
+          if (id === 'dori') addOnNames.push('Dori Latkan');
+          if (id === 'fall') addOnNames.push('Fall Pico');
+        }
+      });
+
+      const total = baseAmount + speedFee + addOnsTotal;
+      document.getElementById('est-total-amount').textContent = '₹' + total;
+
+      let summary = garmentName;
+      if (addOnNames.length > 0) summary += ' + ' + addOnNames.join(', ');
+      if (speedFee > 0) summary += ' (' + speedName + ')';
+      document.getElementById('est-summary-text').textContent = summary;
+
+      const waMsg = `Hello Deeksha Tailors, I calculated an estimate on your website for *${summary}* (Estimated Total: *₹${total}*). I would like to book an appointment!`;
+      const waBtn = document.getElementById('est-whatsapp-btn');
+      if (waBtn) {
+        waBtn.href = `https://api.whatsapp.com/send?phone=917449531663&text=${encodeURIComponent(waMsg)}`;
+      }
+    }
+
+    function trackCustomerOrder(source = 'hero') {
+      const inputEl = document.getElementById(source === 'hero' ? 'hero-track-input' : 'main-track-input');
+      const resultsEl = document.getElementById(source === 'hero' ? 'hero-track-results' : 'main-track-results');
+      if (!inputEl || !resultsEl) return;
+
+      const q = inputEl.value.trim().toLowerCase();
+      if (!q) {
+        showToast('Please enter your 10-digit phone or Bill No.', '⚠️');
+        inputEl.focus();
+        return;
+      }
+
+      let storedOrders = [];
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        storedOrders = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        storedOrders = [];
+      }
+
+      const qClean = q.replace(/\D/g, '');
+      const matches = storedOrders.filter(o => {
+        const phoneMatch = qClean && o.phone && o.phone.includes(qClean);
+        const billMatch = o.orderNo && o.orderNo.toLowerCase() === q;
+        const nameMatch = o.customerName && o.customerName.toLowerCase().includes(q);
+        return phoneMatch || billMatch || nameMatch;
+      });
+
+      resultsEl.classList.remove('hidden');
+
+      if (matches.length === 0) {
+        resultsEl.innerHTML = `
+          <div class="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 text-xs text-rose-800 space-y-1.5">
+            <div class="font-black flex items-center gap-1.5">
+              <span>⚠️</span> <span>No Live Bill Found for "${q}"</span>
+            </div>
+            <p class="text-[11px] text-rose-700">
+              Please double check the 10-digit number or call our shop counter at <b>+91 74495 31663</b>.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      resultsEl.innerHTML = matches.map(o => {
+        const isPaid = (Number(o.balance) || 0) <= 0;
+        let badgeColor = 'bg-pink-100 text-pink-800';
+        if (o.status === 'Ready') badgeColor = 'bg-emerald-100 text-emerald-800 animate-pulse';
+        else if (o.status === 'In Progress') badgeColor = 'bg-amber-100 text-amber-900';
+        else if (o.status === 'Delivered') badgeColor = 'bg-slate-200 text-slate-700';
+
+        let itemsListHtml = '';
+        if (o.items && o.items.length > 0) {
+          itemsListHtml = o.items.map(it => `
+            <div class="flex items-center justify-between text-[11px] text-slate-700 py-0.5">
+              <span>• ${it.desc} (Qty: ${it.qty})</span>
+              <span class="font-bold ${it.isDelivered ? 'text-emerald-700' : 'text-amber-700'}">
+                ${it.isDelivered ? '✔ Ready' : '⏳ Stitching'}
+              </span>
+            </div>
+          `).join('');
+        }
+
+        return `
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs space-y-2">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="font-black text-slate-900 text-sm">Bill #${o.orderNo}</span>
+                <span class="text-[10px] text-slate-500 block">Customer: ${o.customerName}</span>
+              </div>
+              <span class="text-[10px] font-black px-2.5 py-1 rounded-full ${badgeColor}">
+                ${o.status || 'Booked'}
+              </span>
+            </div>
+
+            <div class="bg-white p-2 rounded-xl border border-slate-200 space-y-1">
+              <div class="text-[10px] font-bold text-slate-400 uppercase">Garments in this order:</div>
+              ${itemsListHtml || '<div class="text-[11px] text-slate-500">Stitching Order in Progress</div>'}
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200">
+              <div>
+                <span class="text-slate-500">Scheduled Delivery:</span>
+                <b class="text-indigo-800 ml-1">${o.deliveryDate || 'Within 4-5 Days'}</b>
+              </div>
+              <div>
+                <span class="text-slate-500">Balance Due:</span>
+                <b class="${isPaid ? 'text-emerald-700' : 'text-rose-600'} ml-1">
+                  ${isPaid ? '₹0.00 (Cleared)' : '₹' + Number(o.balance).toFixed(2)}
+                </b>
+              </div>
+            </div>
+
+            <a href="https://api.whatsapp.com/send?phone=917449531663&text=Hi%20Deeksha%20Tailors,%20I%20am%20checking%20status%20for%20Bill%20%23${o.orderNo}%20(${encodeURIComponent(o.customerName)})" target="_blank" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-center block transition text-[11px] mt-2 shadow-sm">
+              💬 Inquire About This Order on WhatsApp
+            </a>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function handleAppointmentSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('appt-name').value.trim();
+      const phone = document.getElementById('appt-phone').value.trim();
+      const date = document.getElementById('appt-date').value || 'Earliest Available';
+      const time = document.getElementById('appt-time').value;
+      const notes = document.getElementById('appt-notes').value.trim() || 'Stitching and consultation';
+
+      const msg = `👗 *NEW FITTING / MEASUREMENT APPOINTMENT REQUEST*\n` +
+        `--------------------------------------------------\n` +
+        `*Customer Name:* ${name}\n` +
+        `*Phone:* +91 ${phone}\n` +
+        `*Preferred Date:* ${date}\n` +
+        `*Preferred Time:* ${time}\n` +
+        `*Requirements:* ${notes}\n` +
+        `--------------------------------------------------\n` +
+        `_Sent via Deeksha Ladies Tailors Website Portal._`;
+
+      const url = `https://api.whatsapp.com/send?phone=917449531663&text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+      showToast('Opening WhatsApp with your booking details...', '📅');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      calculateWebsiteEstimate();
+    });
+  </script>
+</body>
+</html>
