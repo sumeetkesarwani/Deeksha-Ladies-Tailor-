@@ -11,7 +11,7 @@ export const PRODUCTION_STORAGE_KEY = 'deeksha_production_registry_v1';
 
 /**
  * Formats an Admin login identifier for Firebase Email/Password authentication.
- * If no '@' is present, normalizes phone digits (or identifier) and appends '@deekshatailors.com'.
+ * If no '@' is present, normalizes phone digits (or identifier) and appends '@deekshaladiestailor.com'.
  */
 export function formatAdminLoginEmail(identifier: string): string {
   const trimmed = identifier.trim();
@@ -21,9 +21,9 @@ export function formatAdminLoginEmail(identifier: string): string {
   const digits = trimmed.replace(/\D/g, '');
   if (digits.length >= 10) {
     const normalizedPhone = normalizeIndianPhone(trimmed);
-    return `${normalizedPhone}@deekshatailors.com`;
+    return `${normalizedPhone}@deekshaladiestailor.com`;
   }
-  return `${trimmed.replace(/\s+/g, '')}@deekshatailors.com`;
+  return `${trimmed.replace(/\s+/g, '')}@deekshaladiestailor.com`;
 }
 
 export function sanitizeRtdbKey(rawKey: string): string {

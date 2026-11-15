@@ -8,11 +8,11 @@ import {
   sanitizeRtdbKey,
 } from './firebaseSyncHelpers.ts';
 
-test('formatAdminLoginEmail appends @deekshatailors.com when no @ is typed and preserves full emails', () => {
-  assert.equal(formatAdminLoginEmail('7449531663'), '7449531663@deekshatailors.com');
-  assert.equal(formatAdminLoginEmail('+91 74495 31663'), '7449531663@deekshatailors.com');
-  assert.equal(formatAdminLoginEmail('owner@deekshatailors.com'), 'owner@deekshatailors.com');
-  assert.equal(formatAdminLoginEmail('deeksha_admin'), 'deeksha_admin@deekshatailors.com');
+test('formatAdminLoginEmail appends @deekshaladiestailor.com when no @ is typed and preserves full emails', () => {
+  assert.equal(formatAdminLoginEmail('7449531663'), '7449531663@deekshaladiestailor.com');
+  assert.equal(formatAdminLoginEmail('+91 74495 31663'), '7449531663@deekshaladiestailor.com');
+  assert.equal(formatAdminLoginEmail('owner@deekshaladiestailor.com'), 'owner@deekshaladiestailor.com');
+  assert.equal(formatAdminLoginEmail('deeksha_admin'), 'deeksha_admin@deekshaladiestailor.com');
   assert.equal(formatAdminLoginEmail('   '), '');
 });
 

@@ -130,7 +130,7 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
               autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g. 7449531663 or admin@deekshatailors.com"
+              placeholder="e.g. 7449531663 or 7449531663@deekshaladiestailor.com"
               className="w-full px-3.5 py-2.5 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none"
             />
             {formattedPreview && (
