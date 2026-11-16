@@ -21,7 +21,12 @@ import {
   validateAppointmentInput,
   validateReviewInput,
 } from './src/utils/tailoring.ts';
-import { serializeCatalogForRtdbServices } from './src/utils/firebaseSyncHelpers.ts';
+import {
+  extractRtdbRecords,
+  mergeReviewsWithCloud,
+  sanitizeRtdbKey,
+  serializeCatalogForRtdbServices,
+} from './src/utils/firebaseSyncHelpers.ts';
 
 interface OwnerAccount {
   businessId: string;
@@ -92,6 +97,31 @@ async function mirrorToFirebaseRtdb(
     });
   } catch {
     // Best-effort sync; client SDK also writes with authenticated user credentials
+  }
+}
+
+async function fetchMergedReviewsWithCloud(localReviews: CustomerReview[]): Promise<CustomerReview[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+  try {
+    const [reviewsRes, deletedRes] = await Promise.all([
+      fetch(`${FIREBASE_RTDB_URL}/reviews.json`, { signal: controller.signal }),
+      fetch(`${FIREBASE_RTDB_URL}/site/deletedReviewIds.json`, { signal: controller.signal }),
+    ]);
+    const rawReviews = reviewsRes.ok ? await reviewsRes.json() : null;
+    const rawDeleted = deletedRes.ok ? await deletedRes.json() : null;
+    const cloudReviews = rawReviews ? extractRtdbRecords(rawReviews) : [];
+    const deletedReviewIds =
+      rawDeleted && typeof rawDeleted === 'object' ? (rawDeleted as Record<string, unknown>) : undefined;
+    return mergeReviewsWithCloud({
+      cloudReviews,
+      baselineReviews: localReviews,
+      deletedReviewIds,
+    });
+  } catch {
+    return localReviews;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -309,11 +339,12 @@ async function startServer(): Promise<void> {
   app.use(express.json({ limit: '2mb' }));
 
   // --- Public API Routes ---
-  app.get('/api/public/bootstrap', (_req, res) => {
+  app.get('/api/public/bootstrap', async (_req, res) => {
     const store = loadStore();
-    const visibleReviews = store.reviews.filter((r) => r.visible);
+    const mergedReviews = await fetchMergedReviewsWithCloud(store.reviews);
+    const visibleReviews = mergedReviews.filter((r) => r.visible);
     const reviewSummary = computeReviewSummary(
-      store.reviews,
+      mergedReviews,
       store.shopDetails.baseDirectoryRating,
       store.shopDetails.baseDirectoryReviewCount,
       store.shopDetails.googleBusinessUrl,
@@ -382,6 +413,9 @@ async function startServer(): Promise<void> {
       rating?: number;
       service?: string;
       comment?: string;
+      createdAt?: string;
+      visitDate?: string;
+      syncedToRtdb?: boolean;
     };
     const requestedId = String(body.id ?? '').trim();
     const safeId = /^[a-zA-Z0-9_-]{4,80}$/.test(requestedId) ? requestedId : `rev-${Date.now()}`;
@@ -397,6 +431,14 @@ async function startServer(): Promise<void> {
     }
 
     const store = loadStore();
+    const createdAt =
+      typeof body.createdAt === 'string' && body.createdAt.trim()
+        ? body.createdAt.trim()
+        : new Date().toISOString();
+    const visitDate =
+      typeof body.visitDate === 'string' && body.visitDate.trim()
+        ? body.visitDate.trim()
+        : new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     const created: CustomerReview = {
       id: safeId,
       customerName,
@@ -404,14 +446,16 @@ async function startServer(): Promise<void> {
       service,
       comment,
       source: 'Website Customer',
-      visitDate: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+      visitDate,
       visible: true,
       featured: false,
-      createdAt: new Date().toISOString(),
+      createdAt,
     };
     store.reviews = [created, ...store.reviews.filter((r) => r.id !== created.id)];
     saveStore(store);
-    void mirrorToFirebaseRtdb(`reviews/${created.id}`, 'PUT', created);
+    if (!body.syncedToRtdb) {
+      void mirrorToFirebaseRtdb(`reviews/${sanitizeRtdbKey(created.id)}`, 'PUT', created);
+    }
 
     const reviewSummary = computeReviewSummary(
       store.reviews,
@@ -581,10 +625,11 @@ async function startServer(): Promise<void> {
   });
 
   // --- Protected Business Owner Portal Routes ---
-  app.get('/api/admin/overview', requireOwnerAuth, (_req, res) => {
+  app.get('/api/admin/overview', requireOwnerAuth, async (_req, res) => {
     const store = loadStore();
+    const mergedReviews = await fetchMergedReviewsWithCloud(store.reviews);
     const reviewSummary = computeReviewSummary(
-      store.reviews,
+      mergedReviews,
       store.shopDetails.baseDirectoryRating,
       store.shopDetails.baseDirectoryReviewCount,
       store.shopDetails.googleBusinessUrl,
@@ -592,7 +637,7 @@ async function startServer(): Promise<void> {
     res.json({
       orders: store.orders,
       appointments: store.appointments,
-      reviews: store.reviews,
+      reviews: mergedReviews,
       shopDetails: store.shopDetails,
       catalog: store.catalog,
       reviewSummary,
@@ -649,14 +694,12 @@ async function startServer(): Promise<void> {
 
   app.delete('/api/admin/reviews/:id', requireOwnerAuth, (req, res) => {
     const store = loadStore();
-    const before = store.reviews.length;
     store.reviews = store.reviews.filter((r) => r.id !== req.params.id);
-    if (store.reviews.length === before) {
-      res.status(404).json({ error: 'Review not found.' });
-      return;
-    }
     saveStore(store);
-    void mirrorToFirebaseRtdb(`reviews/${req.params.id}`, 'DELETE', undefined, extractFirebaseIdToken(req));
+    const fbToken = extractFirebaseIdToken(req);
+    const safeKey = sanitizeRtdbKey(req.params.id);
+    void mirrorToFirebaseRtdb(`reviews/${safeKey}`, 'DELETE', undefined, fbToken);
+    void mirrorToFirebaseRtdb(`site/deletedReviewIds/${safeKey}`, 'PUT', true, fbToken);
     res.json({ ok: true });
   });
 

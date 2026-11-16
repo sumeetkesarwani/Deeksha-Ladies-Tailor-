@@ -313,14 +313,15 @@ export function normalizeReviewRecord(raw: unknown): CustomerReview | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const id = String(r.id ?? '').trim();
-  const customerName = String(r.customerName ?? '').trim();
-  const comment = String(r.comment ?? '').trim();
+  const customerName = String(r.customerName ?? r.name ?? r.author ?? '').trim();
+  const comment = String(r.comment ?? r.text ?? r.review ?? r.reviewText ?? r.message ?? '').trim();
   if (!id || !customerName || !comment) return null;
 
   const rawSource = String(r.source ?? 'Website Customer').trim() as CustomerReview['source'];
   const source: CustomerReview['source'] = VALID_REVIEW_SOURCES.has(rawSource) ? rawSource : 'Website Customer';
   const rawRating = Number(r.rating);
   const rating = Number.isFinite(rawRating) ? Math.min(5, Math.max(1, Math.round(rawRating))) : 5;
+  const ownerReplyRaw = typeof r.ownerReply === 'string' ? r.ownerReply.trim() : '';
 
   return {
     id,
@@ -329,36 +330,51 @@ export function normalizeReviewRecord(raw: unknown): CustomerReview | null {
     service: String(r.service ?? 'Tailoring Service').trim() || 'Tailoring Service',
     comment,
     source,
-    visitDate: String(r.visitDate ?? '').trim() || 'Verified Visit',
+    visitDate: String(r.visitDate ?? r.date ?? '').trim() || 'Verified Visit',
     visible: r.visible !== false,
     featured: Boolean(r.featured),
-    ...(typeof r.ownerReply === 'string' && r.ownerReply.trim() ? { ownerReply: r.ownerReply.trim() } : {}),
+    ...(ownerReplyRaw ? { ownerReply: ownerReplyRaw } : {}),
     createdAt: String(r.createdAt ?? '').trim() || new Date().toISOString(),
   };
 }
 
 /**
- * Combines Firebase RTDB `/reviews` records with baseline/local reviews so newly submitted
- * reviews appear immediately on all devices without erasing verified baseline reviews.
+ * Combines Firebase RTDB `/reviews` records with baseline/server reviews so existing
+ * reviews and newly submitted customer reviews always remain visible across all devices,
+ * while honoring admin edits (`visible`, `ownerReply`) and explicit deletions (`deletedReviewIds`).
  */
 export function mergeReviewsWithCloud(params: {
   cloudReviews: unknown[];
   baselineReviews: CustomerReview[];
-  reviewsInitialized: boolean;
+  reviewsInitialized?: boolean;
+  deletedReviewIds?: Record<string, unknown> | string[];
 }): CustomerReview[] {
-  const { cloudReviews, baselineReviews, reviewsInitialized } = params;
+  const { cloudReviews, baselineReviews, deletedReviewIds } = params;
+
+  const deletedSet = new Set<string>();
+  if (Array.isArray(deletedReviewIds)) {
+    for (const id of deletedReviewIds) {
+      const cleanId = String(id ?? '').trim();
+      if (cleanId) deletedSet.add(cleanId);
+    }
+  } else if (deletedReviewIds && typeof deletedReviewIds === 'object') {
+    for (const [key, flag] of Object.entries(deletedReviewIds)) {
+      if (flag === true) {
+        deletedSet.add(key);
+      }
+    }
+  }
+
   const normalizedCloud = cloudReviews
     .map(normalizeReviewRecord)
-    .filter((item): item is CustomerReview => item !== null);
-
-  if (reviewsInitialized) {
-    return [...normalizedCloud].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
+    .filter((item): item is CustomerReview => item !== null && !deletedSet.has(item.id));
 
   const byId = new Map<string, CustomerReview>();
   for (const base of baselineReviews) {
     const clean = normalizeReviewRecord(base);
-    if (clean) byId.set(clean.id, clean);
+    if (clean && !deletedSet.has(clean.id)) {
+      byId.set(clean.id, clean);
+    }
   }
   for (const cloudItem of normalizedCloud) {
     byId.set(cloudItem.id, cloudItem);

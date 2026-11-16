@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { firebaseAuth } from './firebase.ts';
+import { authPersistenceReady, firebaseAuth } from './firebase.ts';
 import type {
   AuthUser,
   CatalogConfig,
@@ -9,6 +9,11 @@ import type {
   ShopDetails,
 } from './types.ts';
 import { DEFAULT_CATALOG, computeReviewSummary } from './utils/tailoring.ts';
+import {
+  isAdminShortcutHash,
+  resolveAdminShortcutScreen,
+  stripAdminHashFromUrl,
+} from './utils/adminRouting.ts';
 import { subscribePublicStorefrontRtdb } from './utils/firebaseRtdb.ts';
 import { Navbar } from './components/Navbar.tsx';
 import { HeroSection } from './components/HeroSection.tsx';
@@ -113,6 +118,9 @@ export default function App() {
     }
   });
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [isAdminHash, setIsAdminHash] = useState<boolean>(() => isAdminShortcutHash(window.location.hash));
+  const isAdminHashRef = useRef<boolean>(isAdminHash);
+  const [authResolved, setAuthResolved] = useState<boolean>(false);
   const [activeView, setActiveView] = useState<'public' | 'dashboard'>('public');
   const cloudShopLoadedRef = useRef(false);
   const cloudCatalogLoadedRef = useRef(false);
@@ -128,7 +136,14 @@ export default function App() {
     [reviews, shopDetails],
   );
 
+  // Only load public storefront data when visiting the public storefront or after Admin is authenticated
+  const shouldLoadStorefrontData = !isAdminHash || Boolean(authUser);
+
   useEffect(() => {
+    if (!shouldLoadStorefrontData) {
+      return;
+    }
+
     const loadPublic = async () => {
       try {
         const res = await fetch('/api/public/bootstrap', { cache: 'no-store' });
@@ -147,14 +162,19 @@ export default function App() {
           setCatalog(data.catalog);
         }
         if (Array.isArray(data.reviews) && data.reviews.length > 0) {
-          baselineReviewsRef.current = data.reviews;
+          const byId = new Map<string, CustomerReview>();
+          baselineReviewsRef.current.forEach((r) => byId.set(r.id, r));
+          data.reviews.forEach((r) => byId.set(r.id, r));
+          baselineReviewsRef.current = Array.from(byId.values()).sort((a, b) =>
+            b.createdAt.localeCompare(a.createdAt),
+          );
           setReviews((prev) => {
-            const byId = new Map<string, CustomerReview>();
-            data.reviews.forEach((r) => byId.set(r.id, r));
+            const merged = new Map<string, CustomerReview>();
+            data.reviews.forEach((r) => merged.set(r.id, r));
             prev.forEach((r) => {
-              if (!byId.has(r.id)) byId.set(r.id, r);
+              if (!merged.has(r.id)) merged.set(r.id, r);
             });
-            return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+            return Array.from(merged.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
           });
         }
       } catch {
@@ -195,59 +215,103 @@ export default function App() {
       },
     });
 
-    const unsubscribeAuth = onAuthStateChanged(firebaseAuth, async (fbUser) => {
-      if (!fbUser) {
-        try {
-          localStorage.removeItem(TOKEN_STORAGE_KEY);
-        } catch {
-          // ignore storage error
-        }
-        setAuthUser(null);
-        setAuthToken('');
-        setActiveView('public');
-        return;
-      }
-
-      const fallbackUser: AuthUser = {
-        businessId: fbUser.email || fbUser.uid,
-        ownerName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Deeksha Admin',
-      };
-      setAuthUser(fallbackUser);
-
-      try {
-        const idToken = await fbUser.getIdToken();
-        const res = await fetch('/api/auth/firebase-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { token?: string; user?: AuthUser };
-          if (data.token) {
-            try {
-              localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
-            } catch {
-              // ignore storage error
-            }
-            setAuthToken(data.token);
-          }
-          if (data.user) {
-            setAuthUser(data.user);
-          }
-        }
-      } catch {
-        // Firebase Auth remains valid for Billing & RTDB even if backend session bridge fails
-      }
-    });
-
     return () => {
       window.clearInterval(pollInterval);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       unsubStorefront();
+    };
+  }, [shouldLoadStorefrontData]);
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribeAuth = () => {};
+
+    const handleHashChange = () => {
+      const nextIsAdmin = isAdminShortcutHash(window.location.hash);
+      isAdminHashRef.current = nextIsAdmin;
+      setIsAdminHash(nextIsAdmin);
+      if (nextIsAdmin && firebaseAuth.currentUser) {
+        setActiveView('dashboard');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
+    void authPersistenceReady.then(() => {
+      if (!active) return;
+      unsubscribeAuth = onAuthStateChanged(firebaseAuth, async (fbUser) => {
+        if (!active) return;
+        if (!fbUser) {
+          try {
+            localStorage.removeItem(TOKEN_STORAGE_KEY);
+          } catch {
+            // ignore storage error
+          }
+          setAuthUser(null);
+          setAuthToken('');
+          setActiveView('public');
+          setAuthResolved(true);
+          return;
+        }
+
+        const fallbackUser: AuthUser = {
+          businessId: fbUser.email || fbUser.uid,
+          ownerName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Deeksha Admin',
+        };
+        setAuthUser(fallbackUser);
+        setAuthResolved(true);
+        if (isAdminHashRef.current) {
+          setActiveView('dashboard');
+        }
+
+        try {
+          const idToken = await fbUser.getIdToken();
+          const res = await fetch('/api/auth/firebase-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+          });
+          if (res.ok) {
+            const data = (await res.json()) as { token?: string; user?: AuthUser };
+            if (data.token) {
+              try {
+                localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+              } catch {
+                // ignore storage error
+              }
+              setAuthToken(data.token);
+            }
+            if (data.user) {
+              setAuthUser(data.user);
+            }
+          }
+        } catch {
+          // Firebase Auth remains valid for Billing & RTDB even if backend session bridge fails
+        }
+      });
+    });
+
+    return () => {
+      active = false;
+      window.removeEventListener('hashchange', handleHashChange);
       unsubscribeAuth();
     };
   }, []);
+
+  const clearAdminShortcutHash = () => {
+    isAdminHashRef.current = false;
+    setIsAdminHash(false);
+    if (isAdminShortcutHash(window.location.hash)) {
+      window.history.replaceState(null, '', stripAdminHashFromUrl(window.location));
+    }
+  };
+
+  const handleNavigateView = (view: 'public' | 'dashboard') => {
+    if (view === 'public') {
+      clearAdminShortcutHash();
+    }
+    setActiveView(view);
+  };
 
   const handleLoginSuccess = (user: AuthUser, token: string) => {
     if (token) {
@@ -259,6 +323,7 @@ export default function App() {
       setAuthToken(token);
     }
     setAuthUser(user);
+    setAuthResolved(true);
     setLoginModalOpen(false);
     setActiveView('dashboard');
   };
@@ -281,24 +346,63 @@ export default function App() {
     }
     setAuthUser(null);
     setAuthToken('');
+    clearAdminShortcutHash();
     setActiveView('public');
   };
 
   const handleReviewAdded = (review: CustomerReview) => {
+    baselineReviewsRef.current = [
+      review,
+      ...baselineReviewsRef.current.filter((r) => r.id !== review.id),
+    ];
     setReviews((prev) => [review, ...prev.filter((r) => r.id !== review.id)]);
   };
+
+  const topScreen = resolveAdminShortcutScreen({
+    isAdminHash,
+    authResolved,
+    hasAuthUser: Boolean(authUser),
+    activeView,
+  });
+
+  if (topScreen === 'loading-auth') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAF8F6] px-4 text-stone-800">
+        <div className="w-full max-w-sm bg-white rounded-2xl border border-stone-200 shadow-sm p-6 text-center space-y-3">
+          <img
+            src="/assets/aistudio/1794735885525_5eb76f5f.png"
+            alt="Deeksha Ladies Tailors & Matching Center logo"
+            className="h-14 w-14 object-contain rounded-xl border border-stone-200 bg-[#FAF8F6] mx-auto"
+          />
+          <p className="font-display text-xl font-semibold text-stone-950">Opening Bill Entry</p>
+          <p className="text-xs text-stone-600">Checking your saved Admin session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (topScreen === 'standalone-login') {
+    return (
+      <BusinessLoginModal
+        open={true}
+        standalone={true}
+        onClose={clearAdminShortcutHash}
+        onSuccess={handleLoginSuccess}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F6] text-stone-900">
       <Navbar
         authUser={authUser}
-        activeView={activeView}
+        activeView={topScreen === 'dashboard' ? 'dashboard' : 'public'}
         onOpenLogin={() => setLoginModalOpen(true)}
         onLogout={() => void handleLogout()}
-        onNavigateView={setActiveView}
+        onNavigateView={handleNavigateView}
       />
 
-      {activeView === 'dashboard' && authUser ? (
+      {topScreen === 'dashboard' && authUser ? (
         <BusinessDashboard
           authUser={authUser}
           authToken={authToken}

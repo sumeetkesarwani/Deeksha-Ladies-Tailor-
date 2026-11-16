@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 
 export const firebaseConfig = {
@@ -15,4 +15,8 @@ export const firebaseConfig = {
 
 export const firebaseApp = initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
+export const authPersistenceReady: Promise<void> = setPersistence(
+  firebaseAuth,
+  browserLocalPersistence,
+).catch(() => undefined);
 export const rtdb = getDatabase(firebaseApp);

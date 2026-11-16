@@ -88,7 +88,6 @@ export async function syncAllReviewsToRtdb(reviews: CustomerReview[]): Promise<b
     }
     await update(ref(rtdb), {
       reviews: reviewsMap,
-      'site/reviewsInitialized': true,
     });
     return true;
   } catch {
@@ -96,18 +95,21 @@ export async function syncAllReviewsToRtdb(reviews: CustomerReview[]): Promise<b
   }
 }
 
-export async function deleteReviewFromRtdb(reviewId: string, remainingReviews?: CustomerReview[]): Promise<boolean> {
+export async function deleteReviewFromRtdb(reviewId: string): Promise<boolean> {
   const safeKey = sanitizeRtdbKey(reviewId);
-  if (remainingReviews) {
-    const multiOk = await syncAllReviewsToRtdb(remainingReviews);
-    if (multiOk) return true;
+  try {
+    await update(ref(rtdb), {
+      [`reviews/${safeKey}`]: null,
+      [`site/deletedReviewIds/${safeKey}`]: true,
+    });
+    return true;
+  } catch {
+    const [removeRes, markRes] = await Promise.allSettled([
+      remove(ref(rtdb, `reviews/${safeKey}`)),
+      set(ref(rtdb, `site/deletedReviewIds/${safeKey}`), true),
+    ]);
+    return removeRes.status === 'fulfilled' || markRes.status === 'fulfilled';
   }
-
-  const [removeRes] = await Promise.allSettled([
-    remove(ref(rtdb, `reviews/${safeKey}`)),
-    set(ref(rtdb, 'site/reviewsInitialized'), true),
-  ]);
-  return removeRes.status === 'fulfilled';
 }
 
 export async function saveShopDetailsToRtdb(shopDetails: ShopDetails): Promise<boolean> {
@@ -173,16 +175,16 @@ export function subscribePublicStorefrontRtdb(options: {
   const { getBaselineReviews, onReviewsUpdate, onShopDetailsUpdate, onCatalogUpdate } = options;
 
   let latestCloudReviews: unknown[] = [];
-  let reviewsInitialized = false;
+  let deletedReviewIds: Record<string, unknown> = {};
   let hasReviewsSnapshot = false;
   let hasCloudServices = false;
 
   const emitMergedReviews = () => {
-    if (!hasReviewsSnapshot && !reviewsInitialized) return;
+    if (!hasReviewsSnapshot && Object.keys(deletedReviewIds).length === 0) return;
     const merged = mergeReviewsWithCloud({
       cloudReviews: latestCloudReviews,
       baselineReviews: getBaselineReviews(),
-      reviewsInitialized,
+      deletedReviewIds,
     });
     onReviewsUpdate(merged);
   };
@@ -219,14 +221,14 @@ export function subscribePublicStorefrontRtdb(options: {
     (snapshot) => {
       if (!snapshot.exists()) return;
       const siteVal = snapshot.val() as {
-        reviewsInitialized?: boolean;
+        deletedReviewIds?: Record<string, unknown>;
         shopDetails?: ShopDetails;
         catalog?: CatalogConfig;
       } | null;
       if (!siteVal || typeof siteVal !== 'object') return;
 
-      if (typeof siteVal.reviewsInitialized === 'boolean') {
-        reviewsInitialized = siteVal.reviewsInitialized;
+      if (siteVal.deletedReviewIds && typeof siteVal.deletedReviewIds === 'object') {
+        deletedReviewIds = siteVal.deletedReviewIds;
         emitMergedReviews();
       }
       if (siteVal.shopDetails && typeof siteVal.shopDetails === 'object' && siteVal.shopDetails.businessName) {

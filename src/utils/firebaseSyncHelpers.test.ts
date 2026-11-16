@@ -7,6 +7,7 @@ import {
   formatAdminLoginEmail,
   getAdminLoginEmailCandidates,
   mergeReviewsWithCloud,
+  normalizeReviewRecord,
   parseRtdbServicesSnapshot,
   sanitizeRtdbKey,
   serializeCatalogForRtdbServices,
@@ -172,7 +173,7 @@ test('parseRtdbServicesSnapshot treats cloud /services data as authoritative wit
   assert.equal(clearedServices.catalog.services.length, 0);
 });
 
-test('mergeReviewsWithCloud keeps baseline reviews when uninitialized and uses cloud authority when initialized', () => {
+test('mergeReviewsWithCloud preserves baseline and cloud reviews together and respects explicit deletedReviewIds', () => {
   const baseline = [
     {
       id: 'rev-1',
@@ -186,36 +187,58 @@ test('mergeReviewsWithCloud keeps baseline reviews when uninitialized and uses c
       featured: true,
       createdAt: '2026-10-24T12:00:00.000Z',
     },
+    {
+      id: 'rev-2',
+      customerName: 'Paramita Bose',
+      rating: 5,
+      service: 'Bridal Blouse',
+      comment: 'Zero puckering.',
+      source: 'Justdial Verified' as const,
+      visitDate: 'Oct 2026',
+      visible: true,
+      featured: false,
+      createdAt: '2026-10-12T12:00:00.000Z',
+    },
   ];
   const cloudNew = {
     id: 'rev-999',
-    customerName: 'Ananya',
+    name: 'Ananya',
     rating: 5,
     service: 'Prince Cut Blouse',
-    comment: 'Loved the piping finish.',
+    text: 'Loved the piping finish.',
     source: 'Website Customer',
-    visitDate: 'Nov 2026',
+    date: 'Nov 2026',
     visible: true,
     featured: false,
     createdAt: '2026-11-15T01:00:00.000Z',
   };
+  const cloudEditedBaseline = {
+    ...baseline[0],
+    ownerReply: 'Thank you Srabani ji!',
+  };
 
-  // Uninitialized cloud preserves baseline + adds new cloud review sorted newest first
+  // Even when reviewsInitialized is true, baseline reviews remain visible alongside cloud reviews
   const merged = mergeReviewsWithCloud({
-    cloudReviews: [cloudNew],
-    baselineReviews: baseline,
-    reviewsInitialized: false,
-  });
-  assert.equal(merged.length, 2);
-  assert.equal(merged[0].id, 'rev-999');
-  assert.equal(merged[1].id, 'rev-1');
-
-  // Initialized cloud respects deletions of baseline items
-  const authoritative = mergeReviewsWithCloud({
-    cloudReviews: [cloudNew],
+    cloudReviews: [cloudNew, cloudEditedBaseline],
     baselineReviews: baseline,
     reviewsInitialized: true,
   });
-  assert.equal(authoritative.length, 1);
-  assert.equal(authoritative[0].id, 'rev-999');
+  assert.equal(merged.length, 3);
+  assert.equal(merged[0].id, 'rev-999');
+  assert.equal(merged[0].customerName, 'Ananya');
+  assert.equal(merged[0].comment, 'Loved the piping finish.');
+  assert.equal(merged[1].id, 'rev-1');
+  assert.equal(merged[1].ownerReply, 'Thank you Srabani ji!');
+  assert.equal(merged[2].id, 'rev-2');
+
+  // Deleted review IDs stay excluded from both cloud and baseline
+  const afterDelete = mergeReviewsWithCloud({
+    cloudReviews: [cloudNew, cloudEditedBaseline],
+    baselineReviews: baseline,
+    deletedReviewIds: { 'rev-2': true, 'rev-999': true },
+  });
+  assert.equal(afterDelete.length, 1);
+  assert.equal(afterDelete[0].id, 'rev-1');
+  assert.equal(normalizeReviewRecord({ id: 'x', test: true }), null);
 });
+

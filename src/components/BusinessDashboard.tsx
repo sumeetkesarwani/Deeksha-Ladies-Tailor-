@@ -31,12 +31,12 @@ import {
 import {
   createRtdbCollectionSync,
   deleteReviewFromRtdb,
+  publishReviewToRtdb,
   saveAppointmentToRtdb,
   saveCatalogToRtdb,
   saveShopDetailsToRtdb,
   subscribeAppointmentsRtdb,
   subscribePublicStorefrontRtdb,
-  syncAllReviewsToRtdb,
   type RtdbCollectionController,
 } from '../utils/firebaseRtdb.ts';
 import { CatalogEditorTab } from './CatalogEditorTab.tsx';
@@ -414,6 +414,7 @@ export function BusinessDashboard({
     id: string,
     payload: { visible?: boolean; featured?: boolean; ownerReply?: string },
   ) => {
+    let updatedReview: CustomerReview | undefined;
     const nextReviews = reviews.map((r) => {
       if (r.id !== id) return r;
       const updated: CustomerReview = {
@@ -429,16 +430,18 @@ export function BusinessDashboard({
           delete updated.ownerReply;
         }
       }
+      updatedReview = updated;
       return updated;
     });
 
+    baselineReviewsRef.current = nextReviews;
     setReviews(nextReviews);
     onReviewsUpdated(nextReviews);
 
     try {
       const headers = await getAdminHeaders();
       const [rtdbOk, serverRes] = await Promise.all([
-        syncAllReviewsToRtdb(nextReviews),
+        updatedReview ? publishReviewToRtdb(updatedReview) : Promise.resolve(false),
         fetch(`/api/admin/reviews/${id}`, {
           method: 'PATCH',
           headers,
@@ -461,13 +464,14 @@ export function BusinessDashboard({
 
   const handleDeleteReview = async (id: string) => {
     const remaining = reviews.filter((r) => r.id !== id);
+    baselineReviewsRef.current = remaining;
     setReviews(remaining);
     onReviewsUpdated(remaining);
 
     try {
       const headers = await getAdminHeaders();
       const [rtdbOk, serverRes] = await Promise.all([
-        deleteReviewFromRtdb(id, remaining),
+        deleteReviewFromRtdb(id),
         fetch(`/api/admin/reviews/${id}`, {
           method: 'DELETE',
           headers,

@@ -74,6 +74,9 @@ export function ReviewsSection({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: created.id,
+            createdAt: created.createdAt,
+            visitDate: created.visitDate,
+            syncedToRtdb: rtdbResult.ok,
             ...reviewInput,
           }),
         });
@@ -96,6 +99,7 @@ export function ReviewsSection({
       }
 
       onReviewAdded(created, serverSummary);
+      setSourceFilter('All');
       setCustomerName('');
       setRating(5);
       setComment('');

@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { Eye, EyeOff, Lock, X } from 'lucide-react';
-import { firebaseAuth } from '../firebase.ts';
+import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword } from 'firebase/auth';
+import { ArrowLeft, Eye, EyeOff, Lock, X } from 'lucide-react';
+import { authPersistenceReady, firebaseAuth } from '../firebase.ts';
 import type { AuthUser } from '../types.ts';
 import { formatAdminLoginEmail, getAdminLoginEmailCandidates } from '../utils/firebaseSyncHelpers.ts';
 
 interface BusinessLoginModalProps {
   open: boolean;
+  standalone?: boolean;
   onClose: () => void;
   onSuccess: (user: AuthUser, token: string) => void;
 }
@@ -30,7 +31,7 @@ function getFriendlyFirebaseAuthError(code?: string): string {
   }
 }
 
-export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginModalProps) {
+export function BusinessLoginModal({ open, standalone = false, onClose, onSuccess }: BusinessLoginModalProps) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -53,6 +54,9 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
 
     setLoading(true);
     try {
+      await authPersistenceReady;
+      await setPersistence(firebaseAuth, browserLocalPersistence).catch(() => undefined);
+
       let signedInUser: { email: string | null; displayName: string | null; getIdToken: () => Promise<string> } | null = null;
       let signedInEmail = candidates[0];
       let lastErr: unknown = null;
@@ -114,10 +118,14 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      role={standalone ? undefined : 'dialog'}
+      aria-modal={standalone ? undefined : 'true'}
       aria-labelledby="admin-login-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-xs p-4"
+      className={
+        standalone
+          ? 'min-h-screen flex flex-col items-center justify-center bg-[#FAF8F6] px-4 py-8'
+          : 'fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-xs p-4'
+      }
     >
       <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200 shadow-xl p-6 sm:p-8 space-y-6">
         <div className="flex items-start justify-between gap-4">
@@ -130,24 +138,26 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800">
                 <Lock className="w-3.5 h-3.5" />
-                <span>Protected Workshop &amp; Billing Access</span>
+                <span>Direct Bill Entry &amp; Workshop Login</span>
               </div>
               <h2 id="admin-login-title" className="font-display text-2xl font-semibold text-stone-950">
                 Admin Login
               </h2>
               <p className="text-xs text-stone-600">
-                Sign in with your Admin mobile number or email ID to unlock billing, measurements, AI bill scanner, accounts, and staff management.
+                Sign in once with your Admin mobile number or email ID to stay logged in across restarts and unlock billing, measurements, AI bill scanner, accounts, and staff management.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close admin login modal"
-            className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {!standalone && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close admin login modal"
+              className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
@@ -207,9 +217,22 @@ export function BusinessLoginModal({ open, onClose, onSuccess }: BusinessLoginMo
             disabled={loading}
             className="w-full py-2.5 bg-stone-900 hover:bg-stone-800 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
           >
-            {loading ? 'Signing In...' : 'Sign In to Admin Dashboard'}
+            {loading ? 'Signing In...' : 'Sign In to Bill Entry Dashboard'}
           </button>
         </form>
+
+        {standalone && (
+          <div className="pt-2 border-t border-stone-200 text-center">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 hover:text-rose-800 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Go to Public Storefront Website</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
