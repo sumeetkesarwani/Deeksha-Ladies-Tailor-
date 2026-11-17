@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword } from 'firebase/auth';
-import { ArrowLeft, Eye, EyeOff, Lock, X } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, X } from 'lucide-react';
 import { authPersistenceReady, firebaseAuth } from '../firebase.ts';
 import type { AuthUser } from '../types.ts';
-import { formatAdminLoginEmail, getAdminLoginEmailCandidates } from '../utils/firebaseSyncHelpers.ts';
+import { getAdminLoginEmailCandidates } from '../utils/firebaseSyncHelpers.ts';
 
 interface BusinessLoginModalProps {
   open: boolean;
@@ -34,13 +34,12 @@ function getFriendlyFirebaseAuthError(code?: string): string {
 export function BusinessLoginModal({ open, standalone = false, onClose, onSuccess }: BusinessLoginModalProps) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [idUnlocked, setIdUnlocked] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   if (!open) return null;
-
-  const formattedPreview = identifier.trim() && !identifier.includes('@') ? formatAdminLoginEmail(identifier) : '';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -108,6 +107,7 @@ export function BusinessLoginModal({ open, standalone = false, onClose, onSucces
       onSuccess(serverUser, sessionToken);
       setIdentifier('');
       setPassword('');
+      setIdUnlocked(false);
     } catch (err: unknown) {
       const fbErr = err as { code?: string };
       setError(getFriendlyFirebaseAuthError(fbErr?.code));
@@ -128,25 +128,16 @@ export function BusinessLoginModal({ open, standalone = false, onClose, onSucces
       }
     >
       <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200 shadow-xl p-6 sm:p-8 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
             <img
               src="/assets/aistudio/1794735885525_5eb76f5f.png"
               alt="Deeksha Ladies Tailors & Matching Center logo"
-              className="h-12 w-12 object-contain rounded-xl border border-stone-200 bg-[#FAF8F6] shrink-0 mt-0.5"
+              className="h-12 w-12 object-contain rounded-xl border border-stone-200 bg-[#FAF8F6] shrink-0"
             />
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800">
-                <Lock className="w-3.5 h-3.5" />
-                <span>Direct Bill Entry &amp; Workshop Login</span>
-              </div>
-              <h2 id="admin-login-title" className="font-display text-2xl font-semibold text-stone-950">
-                Admin Login
-              </h2>
-              <p className="text-xs text-stone-600">
-                Sign in once with your Admin mobile number or email ID to stay logged in across restarts and unlock billing, measurements, AI bill scanner, accounts, and staff management.
-              </p>
-            </div>
+            <h2 id="admin-login-title" className="font-display text-2xl font-semibold text-stone-950">
+              Admin Login
+            </h2>
           </div>
           {!standalone && (
             <button
@@ -160,25 +151,23 @@ export function BusinessLoginModal({ open, standalone = false, onClose, onSucces
           )}
         </div>
 
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+        <form autoComplete="off" onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div>
             <label htmlFor="login-admin-identifier" className="block text-xs font-semibold text-stone-700 mb-1">
               Mobile Number or Admin Email ID
             </label>
             <input
               id="login-admin-identifier"
+              name="admin_login_identifier_nocache"
               type="text"
-              autoComplete="username"
+              autoComplete="off"
+              readOnly={!idUnlocked}
+              onPointerDown={() => setIdUnlocked(true)}
+              onFocus={() => setIdUnlocked(true)}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g. 7449531663 or admin@deekshatailors.com"
-              className="w-full px-3.5 py-2.5 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none"
+              className="w-full px-3.5 py-2.5 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none bg-white"
             />
-            {formattedPreview && (
-              <p className="mt-1 text-[11px] text-stone-500 font-mono-tabular">
-                Signing in as {formattedPreview}
-              </p>
-            )}
           </div>
 
           <div>
@@ -188,12 +177,12 @@ export function BusinessLoginModal({ open, standalone = false, onClose, onSucces
             <div className="relative">
               <input
                 id="login-password"
+                name="admin_login_password_nocache"
                 type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter Firebase admin password"
-                className="w-full px-3.5 py-2.5 pr-10 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none"
+                className="w-full px-3.5 py-2.5 pr-10 border border-stone-300 focus:border-rose-800 rounded-lg text-sm outline-none bg-white"
               />
               <button
                 type="button"

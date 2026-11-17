@@ -74,7 +74,7 @@ input::placeholder, textarea::placeholder {
       </div>
     </div>
     <div class="flex items-center flex-wrap gap-1.5 sm:gap-2">
-      <button onclick="openAiSetupModal()" title="Configure Gemini AI Vision API Key" class="bg-purple-700 hover:bg-purple-800 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-black transition active:scale-95 shadow-sm border border-purple-400">
+      <button onclick="toggleAiSetupPanel()" title="Configure Gemini AI Vision API Key" class="bg-purple-700 hover:bg-purple-800 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-black transition active:scale-95 shadow-sm border border-purple-400">
         <span>🤖</span> <span id="header-ai-status">AI Setup</span>
       </button>
       <button onclick="openStaffModal()" title="Staff & Karigar Management" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-black transition active:scale-95 shadow-sm border border-indigo-400">
@@ -190,6 +190,20 @@ input::placeholder, textarea::placeholder {
           <span>🖼️</span> <span>Upload</span>
           <input type="file" id="ai-bill-gallery-input" accept="image/*" class="hidden" onchange="handleBillImageScan(event)" />
         </label>
+      </div>
+    </div>
+    <div id="ai-key-inline-panel" class="hidden mb-3.5 bg-purple-50 border border-purple-200 rounded-xl p-3 space-y-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class="text-xs font-black text-purple-950 uppercase">Gemini API Key (Bill Scanner)</span>
+        <div class="flex items-center gap-2">
+          <span id="ai-key-saved-badge" class="text-[10px] font-bold text-emerald-700 hidden">✅ Key Active</span>
+          <button type="button" onclick="closeAiSetupModal()" class="text-xs text-slate-600 hover:text-slate-900 font-bold px-2 py-0.5 rounded bg-white border border-slate-200">✕</button>
+        </div>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input id="gemini-api-key-input" type="password" autocomplete="new-password" class="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono outline-none focus:ring-2 focus:ring-purple-500" />
+        <button type="button" onclick="saveGeminiApiKey()" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-lg transition active:scale-95">Save Key</button>
+        <button type="button" onclick="clearGeminiApiKey()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-lg">Remove</button>
       </div>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1310,87 +1324,6 @@ input::placeholder, textarea::placeholder {
   </div>
 </div>
 
-<!-- Modal Merge Choice Prompt -->
-<div id="modal-merge-choice" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-5 border border-slate-200 text-center space-y-3">
-    <div class="text-3xl">🔀</div>
-    <h4 class="text-sm font-black text-slate-800">Combine or Replace?</h4>
-    <p id="merge-choice-msg" class="text-xs text-slate-600 leading-normal">
-      Found incoming orders. Do you want to merge them with your current records, or replace everything?
-    </p>
-    <div class="space-y-2 pt-1 text-xs font-bold">
-      <button onclick="executeMergeChoice('merge')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm">
-        ✅ Merge & Combine (Keep Both & Duplicates)
-      </button>
-      <button onclick="executeMergeChoice('replace')" class="w-full py-2 bg-slate-100 hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl">
-        ⚠️ Replace All (Overwrite)
-      </button>
-      <button onclick="cancelMergeChoice()" class="w-full py-1.5 text-slate-500 font-semibold hover:text-slate-800">
-        Cancel
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Confirm -->
-<div id="modal-confirm" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl max-w-xs w-full p-5 border border-slate-200 text-center space-y-3">
-    <div id="confirm-icon" class="text-3xl">⚠️</div>
-    <h4 id="confirm-title" class="text-sm font-black text-slate-800">Confirm Action</h4>
-    <p id="confirm-msg" class="text-xs text-slate-600 leading-normal"></p>
-    <div class="flex gap-2 pt-1">
-      <button id="confirm-btn-cancel" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">Cancel</button>
-      <button id="confirm-btn-ok" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl">Confirm</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: AI Vision API Key Setup -->
-<div id="modal-ai-setup" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 sm:p-6 border border-slate-200 space-y-3.5">
-    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-      <div class="flex items-center gap-2">
-        <span class="text-xl">🤖</span>
-        <div>
-          <h3 class="text-sm font-black text-slate-900 uppercase">AI Handwritten Bill Scanner Setup</h3>
-          <p class="text-[11px] text-slate-500 font-medium">Connect your free Google Gemini API Key</p>
-        </div>
-      </div>
-      <button onclick="closeAiSetupModal()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center">✕</button>
-    </div>
-
-    <div class="bg-purple-50 border border-purple-200 rounded-2xl p-3 text-xs text-purple-950 space-y-1.5">
-      <div class="font-black">How to get your free key (takes 30 seconds):</div>
-      <ol class="list-decimal pl-4 space-y-1 text-[11px] text-purple-900">
-        <li>Open <b>aistudio.google.com</b> in Chrome and sign in with Gmail.</li>
-        <li>Tap <b>"Get API key"</b> ➔ <b>"Create API key"</b>.</li>
-        <li>Copy the code starting with <code>AIzaSy...</code> and paste it below.</li>
-      </ol>
-    </div>
-
-    <div>
-      <label class="block text-[10px] font-black text-slate-600 uppercase mb-1">Your Gemini API Key</label>
-      <input id="gemini-api-key-input" type="password" placeholder="Paste AIzaSy... key here" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-purple-500" />
-      <div class="flex items-center justify-between mt-1.5">
-        <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer">
-          <input type="checkbox" onchange="document.getElementById('gemini-api-key-input').type = this.checked ? 'text' : 'password'" class="rounded accent-purple-600" />
-          <span>Show key characters</span>
-        </label>
-        <span id="ai-key-saved-badge" class="text-[10px] font-bold text-emerald-700 hidden">✅ Key Active</span>
-      </div>
-    </div>
-
-    <div class="flex gap-2 pt-1">
-      <button onclick="clearGeminiApiKey()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl">
-        Remove Key
-      </button>
-      <button onclick="saveGeminiApiKey()" class="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl shadow transition active:scale-95">
-        💾 Save API Key
-      </button>
-    </div>
-  </div>
-</div>
-
 <!-- Modal: Instant Paste Bill Text from Gemini Chat -->
 <div id="modal-paste-bill" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
   <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 sm:p-6 border border-slate-200 space-y-3.5">
@@ -1437,12 +1370,6 @@ input::placeholder, textarea::placeholder {
   <div class="w-14 h-14 border-4 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
   <div id="ai-scanning-title" class="text-base font-black tracking-wide">🤖 Reading Handwritten Slip...</div>
   <p id="ai-scanning-subtitle" class="text-xs text-slate-300 max-w-xs">Extracting customer details, garment quantities, prices, and 16-point measurements...</p>
-</div>
-
-<!-- Notification Toast -->
-<div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 pointer-events-none transition-all duration-200 opacity-0 scale-95">
-  <span id="toast-icon">ℹ️</span>
-  <span id="toast-msg">Notification</span>
 </div>
 
 <script>
@@ -1623,46 +1550,10 @@ function addItemRow(desc = '', qty = 1, rate = '', isDelivered = false) {
   autoUpdateDeliveryStatusFromItems();
 }
 
-let toastTimer = null;
-function showToast(msg, icon = 'ℹ️') {
-  const toast = document.getElementById('toast');
-  const tIcon = document.getElementById('toast-icon');
-  const tMsg = document.getElementById('toast-msg');
-  if (!toast) return;
-  if (tIcon) tIcon.textContent = icon;
-  if (tMsg) tMsg.textContent = msg;
-
-  toast.classList.remove('opacity-0', 'scale-95');
-  toast.classList.add('opacity-100', 'scale-100');
-
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toast.classList.remove('opacity-100', 'scale-100');
-    toast.classList.add('opacity-0', 'scale-95');
-  }, 3500);
-}
+function showToast() {}
 
 function showConfirm(title, msg, icon, onConfirm) {
-  const modal = document.getElementById('modal-confirm');
-  if (!modal) {
-    if (confirm(msg)) onConfirm();
-    return;
-  }
-  document.getElementById('confirm-title').textContent = title;
-  document.getElementById('confirm-msg').textContent = msg;
-  document.getElementById('confirm-icon').textContent = icon || '⚠️';
-
-  const btnOk = document.getElementById('confirm-btn-ok');
-  const btnCancel = document.getElementById('confirm-btn-cancel');
-
-  const cleanup = () => { modal.classList.add('hidden'); };
-  btnCancel.onclick = cleanup;
-  btnOk.onclick = () => {
-    cleanup();
-    if (typeof onConfirm === 'function') onConfirm();
-  };
-
-  modal.classList.remove('hidden');
+  if (typeof onConfirm === 'function') onConfirm();
 }
 
 function filterMeasurementInput(input) {
@@ -1830,15 +1721,25 @@ function updateAiKeyStatusUI() {
   }
 }
 
+function toggleAiSetupPanel() {
+  const input = document.getElementById('gemini-api-key-input');
+  if (input) input.value = getGeminiApiKey();
+  updateAiKeyStatusUI();
+  const panel = document.getElementById('ai-key-inline-panel');
+  if (panel) panel.classList.toggle('hidden');
+}
+
 function openAiSetupModal() {
   const input = document.getElementById('gemini-api-key-input');
   if (input) input.value = getGeminiApiKey();
   updateAiKeyStatusUI();
-  document.getElementById('modal-ai-setup').classList.remove('hidden');
+  const panel = document.getElementById('ai-key-inline-panel');
+  if (panel) panel.classList.remove('hidden');
 }
 
 function closeAiSetupModal() {
-  document.getElementById('modal-ai-setup').classList.add('hidden');
+  const panel = document.getElementById('ai-key-inline-panel');
+  if (panel) panel.classList.add('hidden');
 }
 
 function saveGeminiApiKey() {
@@ -3261,12 +3162,7 @@ function handleSmartImportJson(event) {
         return;
       }
 
-      document.getElementById('merge-choice-msg').innerHTML = `
-        Your app has <b>${orders.length}</b> orders & <b>${staffMembers.length}</b> staff.<br>
-        Backup file contains <b>${incomingOrders.length}</b> orders & <b>${incomingStaff.length}</b> staff.<br><br>
-        Choose <b>Merge & Combine</b> to keep all existing records without deleting anything.
-      `;
-      document.getElementById('modal-merge-choice').classList.remove('hidden');
+      executeMergeChoice('merge');
 
     } catch (err) {
       showToast('Error reading JSON file.', '⚠️');
@@ -3278,7 +3174,6 @@ function handleSmartImportJson(event) {
 }
 
 function executeMergeChoice(choice) {
-  document.getElementById('modal-merge-choice').classList.add('hidden');
   if (!pendingIncomingBackup) return;
 
   const inc = pendingIncomingBackup;
@@ -3354,7 +3249,6 @@ function executeMergeChoice(choice) {
 
 function cancelMergeChoice() {
   pendingIncomingBackup = null;
-  document.getElementById('modal-merge-choice').classList.add('hidden');
 }
 
 function sortOrdersByNumber() {

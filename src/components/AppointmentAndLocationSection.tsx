@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowUpRight, CheckCircle2, Clock, MapPin, MessageCircle, Phone } from 'lucide-react';
+import { ArrowUpRight, Clock, MapPin, MessageCircle, Phone } from 'lucide-react';
 import type { FittingAppointment, ShopDetails } from '../types.ts';
 import {
-  buildAppointmentWhatsAppUrl,
   buildDirectEnquiryWhatsAppUrl,
   validateAppointmentInput,
 } from '../utils/tailoring.ts';
@@ -27,10 +26,6 @@ export function AppointmentAndLocationSection({ shopDetails }: AppointmentAndLoc
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [confirmed, setConfirmed] = useState<{
-    appointment: FittingAppointment;
-    whatsappUrl: string;
-  } | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -78,15 +73,6 @@ export function AppointmentAndLocationSection({ shopDetails }: AppointmentAndLoc
 
       await saveAppointmentToRtdb(created);
 
-      const whatsappUrl = buildAppointmentWhatsAppUrl(shopDetails.whatsappDigits, {
-        name: created.name,
-        phone: created.phone,
-        date: created.preferredDate,
-        timeSlot: created.timeSlot,
-        notes: created.notes,
-      });
-
-      setConfirmed({ appointment: created, whatsappUrl });
       setName('');
       setPhone('');
       setPreferredDate('');
@@ -112,36 +98,6 @@ export function AppointmentAndLocationSection({ shopDetails }: AppointmentAndLoc
               Your booking goes directly to our boutique register and includes an optional WhatsApp confirmation message.
             </p>
           </div>
-
-          {confirmed && (
-            <div role="status" className="p-5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-3">
-              <div className="flex items-center gap-2 text-emerald-900 font-semibold text-sm">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>
-                  Slot reserved for {confirmed.appointment.name} ({confirmed.appointment.preferredDate} ·{' '}
-                  {confirmed.appointment.timeSlot})
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <a
-                  href={confirmed.whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg transition-colors"
-                >
-                  <span>Send WhatsApp Confirmation</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setConfirmed(null)}
-                  className="text-xs font-semibold text-emerald-900 hover:underline"
-                >
-                  Book another slot
-                </button>
-              </div>
-            </div>
-          )}
 
           <form onSubmit={(e) => void handleSubmit(e)} className="bg-[#FAF8F6] rounded-2xl border border-stone-200 p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

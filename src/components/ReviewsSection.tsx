@@ -34,7 +34,6 @@ export function ReviewsSection({
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
 
   const visibleReviews = useMemo(() => reviews.filter((r) => r.visible !== false), [reviews]);
 
@@ -46,7 +45,6 @@ export function ReviewsSection({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError('');
-    setFormSuccess('');
 
     const check = validateReviewInput({ customerName, rating, service, comment });
     if (!check.valid) {
@@ -104,7 +102,6 @@ export function ReviewsSection({
       setRating(5);
       setComment('');
       setShowForm(false);
-      setFormSuccess('Thank you! Your customer review is now published.');
     } catch {
       setFormError('Network error while saving your review.');
     } finally {
@@ -153,7 +150,6 @@ export function ReviewsSection({
               type="button"
               onClick={() => {
                 setShowForm((prev) => !prev);
-                setFormSuccess('');
               }}
               className="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
             >
@@ -161,12 +157,6 @@ export function ReviewsSection({
             </button>
           </div>
         </div>
-
-        {formSuccess && (
-          <div role="status" className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-sm font-medium text-emerald-900">
-            {formSuccess}
-          </div>
-        )}
 
         {showForm && (
           <form onSubmit={(e) => void handleSubmit(e)} className="bg-white rounded-2xl border border-stone-200 p-6 space-y-4">

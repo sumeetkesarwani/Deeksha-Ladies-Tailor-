@@ -95,7 +95,6 @@ export function BusinessDashboard({
   const [loading, setLoading] = useState(false);
   const [savingCatalog, setSavingCatalog] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
 
   const [appointments, setAppointments] = useState<FittingAppointment[]>([]);
   const [reviews, setReviews] = useState<CustomerReview[]>(initialReviews);
@@ -379,11 +378,6 @@ export function BusinessDashboard({
     };
   }, []);
 
-  const flashNotice = (msg: string) => {
-    setNotice(msg);
-    setTimeout(() => setNotice(''), 3000);
-  };
-
   const handleAppointmentStatus = async (id: string, status: AppointmentStatus) => {
     const target = appointments.find((a) => a.id === id);
     if (!target) return;
@@ -402,9 +396,7 @@ export function BusinessDashboard({
       ]);
       if (!rtdbOk && !serverRes?.ok) {
         setError('Could not update appointment.');
-        return;
       }
-      flashNotice(`Appointment updated to ${status}.`);
     } catch {
       setError('Could not update appointment.');
     }
@@ -450,13 +442,7 @@ export function BusinessDashboard({
       ]);
       if (!rtdbOk && !serverRes?.ok) {
         setError('Could not update review.');
-        return;
       }
-      flashNotice(
-        rtdbOk
-          ? 'Review updated and synced across all devices.'
-          : 'Review updated on server (enable Firebase /reviews rules for instant cloud sync).',
-      );
     } catch {
       setError('Could not update review.');
     }
@@ -479,9 +465,7 @@ export function BusinessDashboard({
       ]);
       if (!rtdbOk && !serverRes?.ok) {
         setError('Could not delete review.');
-        return;
       }
-      flashNotice('Review deleted.');
     } catch {
       setError('Could not delete review.');
     }
@@ -516,11 +500,6 @@ export function BusinessDashboard({
       }
       setShopForm(finalShop);
       onShopUpdated(finalShop);
-      flashNotice(
-        rtdbOk
-          ? 'Shop details & Google links synced across all devices.'
-          : 'Shop details saved on server (enable Firebase /site rules for instant cloud sync).',
-      );
     } catch {
       setError('Error saving shop details.');
     }
@@ -554,11 +533,6 @@ export function BusinessDashboard({
       }
       setCatalog(finalCatalog);
       onCatalogUpdated(finalCatalog);
-      flashNotice(
-        rtdbOk
-          ? 'All services, estimator prices, and rates synced across all devices.'
-          : 'Prices saved on server (enable Firebase /site rules for instant cloud sync).',
-      );
     } catch {
       setError('Error saving pricing and services.');
     } finally {
@@ -707,12 +681,6 @@ export function BusinessDashboard({
             </div>
           )}
         </div>
-
-        {notice && (
-          <div role="status" className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-sm font-medium text-emerald-900">
-            {notice}
-          </div>
-        )}
 
         {error && (
           <div role="alert" className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-sm font-medium text-rose-900">

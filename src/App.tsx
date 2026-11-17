@@ -375,7 +375,6 @@ export default function App() {
             className="h-14 w-14 object-contain rounded-xl border border-stone-200 bg-[#FAF8F6] mx-auto"
           />
           <p className="font-display text-xl font-semibold text-stone-950">Opening Bill Entry</p>
-          <p className="text-xs text-stone-600">Checking your saved Admin session...</p>
         </div>
       </div>
     );
