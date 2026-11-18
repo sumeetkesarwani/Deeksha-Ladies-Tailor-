@@ -2556,6 +2556,7 @@ function sendWhatsAppSlipDirect() {
   }
   msg += `• *Balance Due:* ₹${balance.toFixed(2)}\n`;
   msg += `--------------------------------------------------\n`;
+  msg += `🌐 *Check Bill & Order Status:* https://deekshaladiestailor.netlify.app/\n\n`;
   msg += `_Thank you for visiting Deeksha Ladies Tailors! Please collect the Garments with in 15 days of Delivery date._`;
 
   const waUrl = `https://api.whatsapp.com/send?phone=91${phone}&text=${encodeURIComponent(msg)}`;
